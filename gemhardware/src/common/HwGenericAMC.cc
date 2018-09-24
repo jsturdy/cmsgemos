@@ -972,3 +972,114 @@ void gem::hw::HwGenericAMC::linkReset(uint8_t const& gtx)
   linkCounterReset();
   return;
 }
+
+bool gem::hw::HwGenericAMC::resetLink(AMCSCAResetType const& reset,
+                                      uint8_t         const& linkID,
+                                      bool            const& assertAndHold)
+{
+  bool linkStatus = checkStatus(0x1 << linkID);
+  return linkStatus;
+}
+
+bool gem::hw::HwGenericAMC::resetAllLinks(AMCSCAResetType const& reset,
+                                          uint16_t        const& linkMask,
+                                          bool            const& assertAndHold)
+{
+  bool linkStatus = checkStatus(linkMask);
+
+  /*
+    writeReg(getNode('GEM_AMC.SLOW_CONTROL.SCA.ADC_MONITORING.MONITORING_OFF'), 0xffffffff)
+    
+    # Set the sca reset mask if it exists
+    scaResetMaskNode = getNode('GEM_AMC.SLOW_CONTROL.SCA.CTRL.SCA_RESET_ENABLE_MASK')
+    if scaResetMaskNode is not None:
+        origMask = readReg(scaResetMaskNode)
+        writeReg(scaResetMaskNode, ohMask)
+    else:
+        print("No SCA_RESET_ENABLE_MASK register detected, reset will be applied to all links")
+    writeReg(getNode('GEM_AMC.SLOW_CONTROL.SCA.CTRL.MODULE_RESET'), 0x1)
+
+    # Reset the sca reset mask if it exists
+    if scaResetMaskNode is not None:
+    writeReg(scaResetMaskNode, int(origMask,16))
+    checkStatus(getOHlist(ohMask))
+                                                              
+    def fpga_single_hard_reset():
+    writeReg(getNode('GEM_AMC.SLOW_CONTROL.SCA.CTRL.OH_FPGA_HARD_RESET'), 0x1)
+        
+    def fpga_keep_hard_reset(ohList):
+    subheading('Asserting FPGA Hard Reset (and keeping it in reset)');
+    sendScaCommand(0x2, 0x10, 0x4, 0x0, linkMask, false);
+
+    def fpga_remove_hard_reset(ohList):
+    subheading('Asserting FPGA Hard Reset (and keeping it in reset)')
+    sendScaCommand(0x2, 0x10, 0x4, 0xffffffff, ohList, false)
+  */
+  return linkStatus;
+}
+
+std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint8_t  const& channel,
+                                                                            uint8_t  const& command,
+                                                                            uint8_t  const& data_length,
+                                                                            uint8_t  const& data,
+                                                                            uint16_t const& linkMask,
+                                                                            bool     const& readBack)
+{
+  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_CHANNEL").write(channel);
+  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_COMMAND").write(command);
+  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_LENGTH" ).write(data_length);
+  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_DATA"   ).write(data);
+  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_EXECUTE").write(0x1);
+  getGEMHwInterface().dispatch();
+
+  // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_CHANNEL", channel);
+  // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_COMMAND", command);
+  // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_LENGTH",  data_length);
+  // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_DATA",    data);
+  // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_EXECUTE", 0x1);
+
+  // uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.READY");
+  // uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
+
+  std::vector<uhal::ValWord<uint32_t> > reply;
+  reply.reserve(12);
+
+  if (readBack) {
+    for (int i = 0; i < 12; ++i) {
+      if ((linkMask >> i) & 0x1) {
+        // reply.push_back(readReg(getDeviceBaseNode(),
+        //                         toolbox::toString("SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_REPLY_OH%d.SCA_RPY_DATA",i)));
+        reply.push_back(getGEMHwInterface().getNode(toolbox::toString("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_REPLY_OH%d.SCA_RPY_DATA",i)).read());
+      } else {
+        reply.push_back(-1);
+      }
+    }
+  }
+  return reply;
+}
+
+bool gem::hw::HwGenericAMC::checkStatus(uint16_t const& linkMask)
+{
+  uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.READY").read();
+  uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
+  getGEMHwInterface().dispatch();
+
+  // uint32_t rxReady       = readReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.STATUS.READY");
+  // uint32_t criticalError = readReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR");
+  bool statusGood = true;
+
+  for (int i = 0; i < 12; ++i) {
+    if ((linkMask >> i) & 0x1) {
+      uint32_t rxRdyBit   = (rxReady >> i) & 0x1;
+      uint32_t critErrBit = (criticalError >> i) & 0x1;
+      if (!rxRdyBit) {
+        ERROR("gem::hw::HwGenericAMC::checkStatus OH #"
+              << i << " is not ready: RX ready = "
+              << rxRdyBit << ", critical error = "
+              << critErrBit);
+        statusGood = false;
+      }
+    }
+  }
+  return statusGood;
+}

@@ -748,6 +748,48 @@ namespace gem {
          */
         virtual void linkReset(uint8_t const& link);
 
+        /**
+         * @brief performs a reset of the GenericAMC link
+         * @param reset is the type of reset to send (SCA Reset, HardReset)
+         * @param linkID is the link to perform the reset on
+         * @param assertAndHold, in the case of a HardReset, hold the link in this state until released
+         */
+        virtual bool resetLink(AMCSCAResetType const& reset,
+                               uint8_t         const& linkID,
+                               bool            const& assertAndHold=false);
+
+        /**
+         * @brief performs a reset of the GenericAMC link
+         * @param reset is the type of reset to send (SCA Reset, HardReset)
+         * @param linkMask is the mask of links to perform the reset on
+         * @param assertAndHold, in the case of a HardReset, hold the link in this state until released
+         */
+        virtual bool resetAllLinks(AMCSCAResetType const& reset,
+                                   uint16_t        const& linkMask=0xfff,
+                                   bool            const& assertAndHold=false);
+
+        /**
+         * @brief performs a reset of the GenericAMC link
+         * @param channel is the channel on the SCA to control
+         * @param command is the command to send to the SCA
+         * @param dataLength is the size of the SCA data message
+         * @param data is the data word to send to the SCA
+         * @param linkMask is the mask of links to operate on
+         * @param readBack control the return of the transaction reply
+         */
+        std::vector<uhal::ValWord<uint32_t> > sendSCACommand(uint8_t  const& channel,
+                                                             uint8_t  const& command,
+                                                             uint8_t  const& dataLength,
+                                                             uint8_t  const& data,
+                                                             uint16_t const& linkMask=0xfff,
+                                                             bool     const& readBack=false);
+
+        /**
+         * @brief performs a reset of the GenericAMC link
+         * @param linkMask is the mask of links to operate on
+         */
+        bool checkStatus(uint16_t const& linkMask);
+
         std::vector<AMCIPBusCounters> m_ipBusCounters; /** for each gtx, IPBus counters */
 
       protected:

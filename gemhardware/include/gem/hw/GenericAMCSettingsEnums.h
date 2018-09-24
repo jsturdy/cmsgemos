@@ -66,6 +66,17 @@ namespace gem {
         } OHLinkCount;
       };
     };  // class AMCSettings
+
+    class SCASettings {
+    public:
+
+      struct SCAResetType { //SCAResetType settings
+        enum ESCAResetType { //SCAResetType settings
+          SCAReset  = 0x0, //Use the AMC13 style TTC encoding
+          HardReset = 0x1, //Use the CSC/GEM style TTC encoding
+        } SCAResetType;
+      };
+    };  // class SCASettings
   }  // namespace gem::hw
 
   // <name>  is the enum scoped namespace for scope::VALUE access
@@ -78,6 +89,8 @@ namespace gem {
   typedef gem::hw::AMCSettings::TTCCommand  AMCTTCCommand;
   typedef gem::hw::AMCSettings::OHLinkCount AMCOHLinkCount;
 
+  typedef gem::hw::SCASettings::SCAResetType   AMCSCAResetType;
+
   // typedef the enum for casting and access
   typedef gem::hw::AMCLinkSettings::LinkBitMasks::ELinkBitMasks   AMCLinkBitMasksT;
   typedef gem::hw::AMCLinkSettings::LinkBitShifts::ELinkBitShifts AMCLinkBitShiftsT;
@@ -85,6 +98,9 @@ namespace gem {
   typedef gem::hw::AMCSettings::TTCEncoding::ETTCEncoding AMCTTCEncodingT;
   typedef gem::hw::AMCSettings::TTCCommand::ETTCCommand   AMCTTCCommandT;
   typedef gem::hw::AMCSettings::OHLinkCount::EOHLinkCount AMCOHLinkCountT;
+
+  typedef gem::hw::SCASettings::SCAResetType::ESCAResetType   AMCSCAResetTypeT;
+
 }  // namespace gem
 
 #endif  // GEM_HW_AMCSETTINGSENUMS_H
