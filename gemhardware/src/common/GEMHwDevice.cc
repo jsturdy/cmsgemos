@@ -464,6 +464,7 @@ void gem::hw::GEMHwDevice::writeReg(std::string const& name, uint32_t const val)
   while (retryCount < MAX_IPBUS_RETRIES) {
     ++retryCount;
     try {
+      // FIXME REMOVE UNNECESSARY CHECKS
       uhal::ValWord<uint32_t> ival;
       if (this->getNode(name).getPermission() != uhal::defs::WRITE)
         ival = this->getNode(name).read();

@@ -108,7 +108,7 @@ std::vector<uint32_t> gem::hw::glib::GLIBManager::dumpGLIBFIFO(int const& glib)
     return dump;
     //} else if (!(m_glibs.at(glib)->hasTrackingData(0))) {
     //  CMSGEMOS_WARN("GLIBManager::dumpGLIBFIFO Specified GLIB card " << glib
-    //       << " has no tracking data in the FIFO");
+    //                << " has no tracking data in the FIFO");
     //  return dump;
   }
 
@@ -173,10 +173,17 @@ void gem::hw::glib::GLIBManager::initializeAction()
 {
   CMSGEMOS_DEBUG("GLIBManager::initializeAction begin");
   // FIXME make me more streamlined
+  std::stringstream statemsg;
+  statemsg << "Looping over possble AMCs";
+  m_stateMessage = statemsg.str();
+
   for (unsigned slot = 0; slot < MAX_AMCS_PER_CRATE; ++slot) {
     CMSGEMOS_DEBUG("GLIBManager::looping over slots(" << (slot+1) << ") and finding expected cards");
     GLIBInfo& info = m_glibInfo[slot].bag;
     if ((m_amcEnableMask >> (slot)) & 0x1) {
+      statemsg << "AMC in slot " << (slot<<1) << " found in enable mask";
+      m_stateMessage = statemsg.str();
+
       CMSGEMOS_DEBUG("GLIBManager::info:" << info.toString());
       CMSGEMOS_DEBUG("GLIBManager::expect a card in slot " << (slot+1));
       CMSGEMOS_DEBUG("GLIBManager::bag: "
@@ -210,6 +217,8 @@ void gem::hw::glib::GLIBManager::initializeAction()
     CMSGEMOS_DEBUG("GLIBManager::creating pointer to card in slot " << (slot+1));
 
     // create the cfgInfoSpace object (qualified vs non?)
+    statemsg << "Creating HwDevice for AMC in slot " << (slot+1);
+    m_stateMessage = statemsg.str();
     std::string deviceName = toolbox::toString("gem-shelf%02d-amc%02d",
                                                info.crateID.value_,
                                                info.slotID.value_);
@@ -287,6 +296,8 @@ void gem::hw::glib::GLIBManager::initializeAction()
     if (!info.present)
       continue;
 
+    statemsg << "Checking connectivity for AMC in slot " << (slot+1);
+    m_stateMessage = statemsg.str();
     glib_shared_ptr amc = m_glibs.at(slot);
     if (amc->isHwConnected()) {
       CMSGEMOS_DEBUG("GLIBManager::connected a card in slot " << (slot+1));

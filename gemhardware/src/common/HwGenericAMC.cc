@@ -989,7 +989,7 @@ bool gem::hw::HwGenericAMC::resetAllLinks(AMCSCAResetType const& reset,
 
   /*
     writeReg(getNode('GEM_AMC.SLOW_CONTROL.SCA.ADC_MONITORING.MONITORING_OFF'), 0xffffffff)
-    
+
     # Set the sca reset mask if it exists
     scaResetMaskNode = getNode('GEM_AMC.SLOW_CONTROL.SCA.CTRL.SCA_RESET_ENABLE_MASK')
     if scaResetMaskNode is not None:
@@ -1003,10 +1003,10 @@ bool gem::hw::HwGenericAMC::resetAllLinks(AMCSCAResetType const& reset,
     if scaResetMaskNode is not None:
     writeReg(scaResetMaskNode, int(origMask,16))
     checkStatus(getOHlist(ohMask))
-                                                              
+
     def fpga_single_hard_reset():
     writeReg(getNode('GEM_AMC.SLOW_CONTROL.SCA.CTRL.OH_FPGA_HARD_RESET'), 0x1)
-        
+
     def fpga_keep_hard_reset(ohList):
     subheading('Asserting FPGA Hard Reset (and keeping it in reset)');
     sendScaCommand(0x2, 0x10, 0x4, 0x0, linkMask, false);
@@ -1038,8 +1038,8 @@ std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint
   // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_DATA",    data);
   // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_EXECUTE", 0x1);
 
-  // uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.READY");
-  // uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
+  // uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.READY");
+  // uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
 
   std::vector<uhal::ValWord<uint32_t> > reply;
   reply.reserve(12);
@@ -1060,8 +1060,8 @@ std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint
 
 bool gem::hw::HwGenericAMC::checkStatus(uint16_t const& linkMask)
 {
-  uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.READY").read();
-  uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
+  uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.READY").read();
+  uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
   getGEMHwInterface().dispatch();
 
   // uint32_t rxReady       = readReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.STATUS.READY");
@@ -1073,10 +1073,10 @@ bool gem::hw::HwGenericAMC::checkStatus(uint16_t const& linkMask)
       uint32_t rxRdyBit   = (rxReady >> i) & 0x1;
       uint32_t critErrBit = (criticalError >> i) & 0x1;
       if (!rxRdyBit) {
-        ERROR("gem::hw::HwGenericAMC::checkStatus OH #"
-              << i << " is not ready: RX ready = "
-              << rxRdyBit << ", critical error = "
-              << critErrBit);
+        CMSGEMOS_ERROR("gem::hw::HwGenericAMC::checkStatus OH #"
+                       << i << " is not ready: RX ready = "
+                       << rxRdyBit << ", critical error = "
+                       << critErrBit);
         statusGood = false;
       }
     }

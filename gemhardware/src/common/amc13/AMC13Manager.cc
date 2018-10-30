@@ -181,8 +181,8 @@ gem::hw::amc13::AMC13Manager::~AMC13Manager() {
 void gem::hw::amc13::AMC13Manager::actionPerformed(xdata::Event& event)
 {
   if (event.type() == "setDefaultValues" || event.type() == "urn:xdaq-event:setDefaultValues") {
-    CMSGEMOS_DEBUG("AMC13Manager::actionPerformed() setDefaultValues" <<
-          "Default configuration values have been loaded from xml profile");
+    CMSGEMOS_DEBUG("AMC13Manager::actionPerformed() setDefaultValues"
+                   << "Default configuration values have been loaded from xml profile");
     // p_gemMonitor->startMonitoring();
     // update configuration variables
     m_connectionFile     = m_amc13Params.bag.connectionFile.value_;
@@ -207,10 +207,10 @@ void gem::hw::amc13::AMC13Manager::actionPerformed(xdata::Event& event)
     m_enableLEMO             = m_localTriggerConfig.bag.enableLEMO.value_;
 
     CMSGEMOS_DEBUG("AMC13Manager::actionPerformed m_enableLocalL1A " << std::endl
-         << m_localTriggerConfig.bag.toString());
+                   << m_localTriggerConfig.bag.toString());
 
     CMSGEMOS_DEBUG("AMC13Manager::actionPerformed BGO channels "
-          << m_amc13Params.bag.bgoConfig.size());
+                   << m_amc13Params.bag.bgoConfig.size());
 
     for (auto bconf = m_amc13Params.bag.bgoConfig.begin(); bconf != m_amc13Params.bag.bgoConfig.end(); ++bconf)
       if (bconf->bag.channel > -1)
@@ -336,7 +336,7 @@ void gem::hw::amc13::AMC13Manager::initializeAction()
 
   // enable daq link (if SFP mask is non-zero
   CMSGEMOS_DEBUG("AMC13Manager::initializeAction Enabling DAQLink with settings: fake data:" << m_enableFakeData
-        << ", sfpMask:" << m_sfpMask);
+                 << ", sfpMask:" << m_sfpMask);
 
   p_amc13->fakeDataEnable(m_enableFakeData);
   p_amc13->daqLinkEnable(m_enableDAQLink);
@@ -348,7 +348,7 @@ void gem::hw::amc13::AMC13Manager::initializeAction()
   CMSGEMOS_INFO("AMC13Manager::initializeAction m_amcIgnoreTTSList " << m_amcIgnoreTTSList);
   m_ignoreAMCTTS = p_amc13->parseInputEnableList(m_amcIgnoreTTSList,true);
   CMSGEMOS_INFO("AMC13Manager::initializeAction m_amcIgnoreTTSList " << m_amcIgnoreTTSList
-       << " parsed as m_ignoreAMCTTS: " << std::hex << m_ignoreAMCTTS << std::dec);
+                << " parsed as m_ignoreAMCTTS: " << std::hex << m_ignoreAMCTTS << std::dec);
   if (m_ignoreAMCTTS) {
     p_amc13->ttsDisableMask(m_ignoreAMCTTS);
   } else {
@@ -407,10 +407,10 @@ void gem::hw::amc13::AMC13Manager::configureAction()
 
   if (m_enableLocalTTC) {
     CMSGEMOS_DEBUG("AMC13Manager::configureAction configuring BGO channels "
-          << m_bgoConfig.size());
+                   << m_bgoConfig.size());
     for (auto bchan = m_bgoConfig.begin(); bchan != m_bgoConfig.end(); ++bchan) {
       CMSGEMOS_DEBUG("AMC13Manager::configureAction channel "
-            << bchan->bag.channel.value_);
+                     << bchan->bag.channel.value_);
       if (bchan->bag.channel.value_ > -1) {
         if (bchan->bag.isLong.value_)
           p_amc13->configureBGOLong(bchan->bag.channel.value_, bchan->bag.cmd.value_, bchan->bag.bx.value_,
@@ -509,7 +509,7 @@ void gem::hw::amc13::AMC13Manager::pauseAction()
   // we can just disable them here maybe?
   if (m_scanType.value_ == 2 || m_scanType.value_ == 3) {
     CMSGEMOS_INFO("AMC13Manager::pauseAction disabling triggers for scan, triggers seen this point = "
-	 << p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO") - m_updatedL1ACount);
+                  << p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO") - m_updatedL1ACount);
     m_updatedL1ACount = p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO");
     CMSGEMOS_INFO("AMC13Manager::timeExpried, total triggers seen = " << m_updatedL1ACount);
   }
@@ -814,7 +814,7 @@ void gem::hw::amc13::AMC13Manager::timeExpired(toolbox::task::TimerEvent& event)
   uint64_t currentTrigger = p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO") - m_updatedL1ACount;
 
   CMSGEMOS_DEBUG("AMC13Manager::timeExpried, NTriggerRequested = " << m_nScanTriggers.value_
-        << " currentT = " << currentTrigger << " triggercounter final =  " << m_updatedL1ACount );
+                 << " currentT = " << currentTrigger << " triggercounter final =  " << m_updatedL1ACount );
 
   if (currentTrigger >=  m_nScanTriggers.value_){
     if (m_enableLocalL1A) {
@@ -833,7 +833,7 @@ void gem::hw::amc13::AMC13Manager::timeExpired(toolbox::task::TimerEvent& event)
       */
     }
     CMSGEMOS_INFO("AMC13Manager::timeExpried, triggers seen this point = "
-	 << p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO") - m_updatedL1ACount);
+                  << p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO") - m_updatedL1ACount);
     // m_updatedL1ACount = p_amc13->read(::amc13::AMC13::T1,"STATUS.GENERAL.L1A_COUNT_LO");
     // CMSGEMOS_INFO("AMC13Manager::timeExpried, total triggers seen = " << m_updatedL1ACount);
     endScanPoint();
