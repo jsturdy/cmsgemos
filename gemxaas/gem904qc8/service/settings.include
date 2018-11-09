@@ -3,7 +3,7 @@
 #include "service/defaultsettings.include"
 
 #undef SLIM_MACRO_SERVICE_HOST
-#define SLIM_MACRO_SERVICE_HOST cosmicstandtif
+#define SLIM_MACRO_SERVICE_HOST gem904qc8daq
 #undef SLIM_MACRO_DOMAINNAME
 #define SLIM_MACRO_DOMAINNAME   cern.ch
 #undef SLIM_MACRO_SUBNET
