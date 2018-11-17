@@ -7,7 +7,7 @@
 #undef SLIM_MACRO_DOMAINNAME
 #define SLIM_MACRO_DOMAINNAME   cern.ch
 #undef SLIM_MACRO_SUBNET
-#define SLIM_MACRO_SUBNET       "137.138.0.0"
+#define SLIM_MACRO_SUBNET       "128.141.0.0"
 
 #undef SLIM_MACRO_SERVICE_LIST
 #define SLIM_MACRO_SERVICE_LIST directory-service b2in-eventing heartbeat xmas-slash2g bridge2g-xmas bridge2g-sentinel xmas-admin timeline
