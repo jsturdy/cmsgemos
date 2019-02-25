@@ -1,10 +1,10 @@
+#include "gem/hw/optohybrid/HwOptoHybrid.h"
+
 #include <bitset>
 #include <chrono>
 #include <iomanip>
 #include <algorithm>
 #include <functional>
-
-#include "gem/hw/optohybrid/HwOptoHybrid.h"
 
 // gem::hw::optohybrid::HwOptoHybrid::HwOptoHybrid() :
 //   gem::hw::GEMHwDevice::GEMHwDevice("HwOptoHybrid"),
@@ -73,19 +73,19 @@ gem::hw::optohybrid::HwOptoHybrid::HwOptoHybrid(std::string const& optohybridDev
 }
 
 // FIXME: convert to HwGenericAMC
-gem::hw::optohybrid::HwOptoHybrid::HwOptoHybrid(gem::hw::glib::HwGLIB const& glibDevice,
+gem::hw::optohybrid::HwOptoHybrid::HwOptoHybrid(gem::hw::HwGenericAMC const& amcDevice,
                                                 uint8_t const& slot) :
-  gem::hw::GEMHwDevice::GEMHwDevice(toolbox::toString("%s.OptoHybrid_%d",(glibDevice.getLoggerName()).c_str(),(int)slot),
-                                    dynamic_cast<uhal::HwInterface const&>(glibDevice)),
+  gem::hw::GEMHwDevice::GEMHwDevice(toolbox::toString("%s.OptoHybrid_%d",(amcDevice.getLoggerName()).c_str(),(int)slot),
+                                    dynamic_cast<uhal::HwInterface const&>(amcDevice)),
   //monOptoHybrid_(0),
   b_links{false,false,false},
   b_is_initial(true),
   m_controlLink(-1),
   m_slot((int)slot)
 {
-  CMSGEMOS_INFO("HwOptoHybrid creating OptoHybrid device from GLIB device " << glibDevice.getLoggerName());
+  CMSGEMOS_INFO("HwOptoHybrid creating OptoHybrid device from AMC device " << amcDevice.getLoggerName());
   //use a connection file and connection manager?
-  setDeviceID(toolbox::toString("%s.optohybrid%02d",glibDevice.getDeviceID().c_str(),slot));
+  setDeviceID(toolbox::toString("%s.optohybrid%02d",amcDevice.getDeviceID().c_str(),slot));
   //uhal::ConnectionManager manager ( "file://${GEM_ADDRESS_TABLE_PATH}/connections.xml" );
   // p_gemConnectionManager.reset(new uhal::ConnectionManager("file://${GEM_ADDRESS_TABLE_PATH}/connections.xml"));
   // p_gemHW.reset(new uhal::HwInterface(p_gemConnectionManager->getDevice(this->getDeviceID())));

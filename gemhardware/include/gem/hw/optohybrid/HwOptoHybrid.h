@@ -4,8 +4,8 @@
 #define GEM_HW_OPTOHYBRID_HWOPTOHYBRID_H
 
 #include "gem/hw/GEMHwDevice.h"
-#include "gem/hw/glib/HwGLIB.h"
-#include "gem/hw/vfat/HwVFAT2.h"
+#include "gem/hw/HwGenericAMC.h"
+/* #include "gem/hw/vfat/HwVFAT2.h" */
 
 #include "gem/hw/optohybrid/exception/Exception.h"
 #include "gem/hw/optohybrid/OptoHybridSettingsEnums.h"
@@ -27,6 +27,7 @@ namespace gem {
         {
         public:
           /**
+           * FIXME OBSOLETE REMOVE
            * @struct OptoHybridWBMasterCounters
            * @brief This struct stores retrieved counters related to the OptoHybrid wishbone transactions
            * @var OptoHybridWBMasterCounters::GTX
@@ -66,6 +67,7 @@ namespace gem {
           } OptoHybridWBMasterCounters;
 
           /**
+           * FIXME OBSOLETE REMOVE
            * @struct OptoHybridWBSlaveCounters
            * @brief This struct stores retrieved counters related to the OptoHybrid wishbone transactions
            * @var OptoHybridWBSlaveCounters::I2C
@@ -132,6 +134,7 @@ namespace gem {
           } OptoHybridWBSlaveCounters;
 
           /**
+           * FIXME OBSOLETE REMOVE
            * @struct OptoHybridT1Counters
            * @brief This struct stores retrieved counters related to the OptoHybrid T1 signals
            * @var OptoHybridT1Counters::GTX_TTC
@@ -193,7 +196,7 @@ namespace gem {
           HwOptoHybrid(std::string const& optohybridDevice, std::string const& connectionURI,
                        std::string const& addressTable);
           HwOptoHybrid(std::string const& optohybridDevice, uhal::HwInterface& uhalDevice);
-          HwOptoHybrid(gem::hw::glib::HwGLIB const& glib,
+          HwOptoHybrid(gem::hw::HwGenericAMC const& amc,
                        uint8_t               const& slot);
 
           /*
@@ -223,7 +226,7 @@ namespace gem {
            * Connect to te RPC manager and load necessary modules
            * @param reconnect determine if the conection should be reestablished and the modules reloaded
            */
-          void connectRPC(bool reconnect=false) override;
+          virtual void connectRPC(bool reconnect=false) override;
 
           virtual bool isHwConnected() override;
 
@@ -1276,7 +1279,7 @@ namespace gem {
           int m_slot;                ///<
 
         };  // class HwOptoHybrid
-    }  // namespace gem::hw::glib
+    }  // namespace gem::hw::optohybrid
   }  // namespace gem::hw
 }  // namespace gem
 
