@@ -1025,12 +1025,12 @@ std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint
                                                                             uint16_t const& linkMask,
                                                                             bool     const& readBack)
 {
-  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_CHANNEL").write(channel);
-  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_COMMAND").write(command);
-  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_LENGTH" ).write(data_length);
-  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_DATA"   ).write(data);
-  getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_EXECUTE").write(0x1);
-  getGEMHwInterface().dispatch();
+  this->getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_CHANNEL").write(channel);
+  this->getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_COMMAND").write(command);
+  this->getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_LENGTH" ).write(data_length);
+  this->getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_DATA"   ).write(data);
+  this->getNode("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_EXECUTE").write(0x1);
+  this->dispatch();
 
   // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_CHANNEL", channel);
   // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_COMMAND", command);
@@ -1038,8 +1038,8 @@ std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint
   // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_DATA",    data);
   // writeReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_CMD.SCA_CMD_EXECUTE", 0x1);
 
-  // uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.READY");
-  // uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
+  // uhal::ValWord<uint32_t> rxReady       = this->getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.READY");
+  // uhal::ValWord<uint32_t> criticalError = this->getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
 
   std::vector<uhal::ValWord<uint32_t> > reply;
   reply.reserve(12);
@@ -1049,7 +1049,7 @@ std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint
       if ((linkMask >> i) & 0x1) {
         // reply.push_back(readReg(getDeviceBaseNode(),
         //                         toolbox::toString("SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_REPLY_OH%d.SCA_RPY_DATA",i)));
-        reply.push_back(getGEMHwInterface().getNode(toolbox::toString("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_REPLY_OH%d.SCA_RPY_DATA",i)).read());
+        reply.push_back(this->getNode(toolbox::toString("GEM_AMC.SLOW_CONTROL.SCA.MANUAL_CONTROL.SCA_REPLY_OH%d.SCA_RPY_DATA",i)).read());
       } else {
         reply.push_back(-1);
       }
@@ -1060,9 +1060,9 @@ std::vector<uhal::ValWord<uint32_t> > gem::hw::HwGenericAMC::sendSCACommand(uint
 
 bool gem::hw::HwGenericAMC::checkStatus(uint16_t const& linkMask)
 {
-  uhal::ValWord<uint32_t> rxReady       = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.READY").read();
-  uhal::ValWord<uint32_t> criticalError = getGEMHwInterface().getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
-  getGEMHwInterface().dispatch();
+  uhal::ValWord<uint32_t> rxReady       = this->getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.READY").read();
+  uhal::ValWord<uint32_t> criticalError = this->getNode("GEM_AMC.SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR").read();
+  this->dispatch();
 
   // uint32_t rxReady       = readReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.STATUS.READY");
   // uint32_t criticalError = readReg(getDeviceBaseNode(),"SLOW_CONTROL.SCA.STATUS.CRITICAL_ERROR");
