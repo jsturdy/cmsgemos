@@ -11,7 +11,7 @@ Project=cmsgemos
 ShortProject=gem
 
 ## Version variables from Makefile and LongPackage
-LongPackageLoc=$(shell echo "$(LongPackage)" | tr '[:lower:]' '[:upper:]')
+LongPackageLoc=$(shell echo "$(ShortProject)$(PackageName)" | tr '[:lower:]' '[:upper:]')
 
 ifndef PACKAGE_VER_MAJOR
 PACKAGE_VER_MAJOR := $($(LongPackageLoc)_VER_MAJOR)
