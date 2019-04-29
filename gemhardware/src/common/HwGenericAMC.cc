@@ -16,7 +16,6 @@ gem::hw::HwGenericAMC::HwGenericAMC(std::string const& amcDevice,
   this->setDeviceBaseNode("GEM_AMC");
 
   for (unsigned li = 0; li < gem::hw::utils::N_GTX; ++li) {
-    b_links[li] = false;
     AMCIPBusCounters tmpGTXCounter;
     m_ipBusCounters.push_back(tmpGTXCounter);
   }
@@ -35,7 +34,6 @@ gem::hw::HwGenericAMC::HwGenericAMC(std::string const& amcDevice,
   this->setup(amcDevice);
   this->setDeviceBaseNode("GEM_AMC");
   for (unsigned li = 0; li < gem::hw::utils::N_GTX; ++li) {
-    b_links[li] = false;
     AMCIPBusCounters tmpGTXCounter;
     m_ipBusCounters.push_back(tmpGTXCounter);
   }
@@ -53,7 +51,6 @@ gem::hw::HwGenericAMC::HwGenericAMC(std::string const& amcDevice,
   this->setDeviceBaseNode("GEM_AMC"); // needed?
 
   for (unsigned li = 0; li < gem::hw::utils::N_GTX; ++li) {
-    b_links[li] = false;
     AMCIPBusCounters tmpGTXCounter;
     m_ipBusCounters.push_back(tmpGTXCounter);
   }
@@ -102,7 +99,6 @@ bool gem::hw::HwGenericAMC::isHwConnected()
       for (uint8_t gtx = 0; gtx < m_maxLinks; ++gtx) {
         // FIXME OBSOLETE!!! somehow need to actually check that the specified link is present
         // check GBT status?
-        b_links[gtx] = true;
         CMSGEMOS_INFO("m_links 0x" << std::hex << std::setw(8) << std::setfill('0')
                       << m_links
                       << " 0x1 << gtx = " << std::setw(8) << std::setfill('0') << (0x1<<gtx)
@@ -269,7 +265,6 @@ bool gem::hw::HwGenericAMC::linkCheck(uint8_t const& gtx, std::string const& opM
     CMSGEMOS_ERROR(msg);
     // XCEPT_RAISE(gem::hw::exception::InvalidLink,msg);
     return false;
-    //  } else if (!b_links[gtx]) {
   } else if (!((m_links>>gtx)&0x1)) {
     CMSGEMOS_INFO("linkCheck:: m_links 0x" << std::hex <<std::setw(8) << std::setfill('0')
                   << m_links << std::dec);

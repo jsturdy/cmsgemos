@@ -61,7 +61,6 @@ gem::hw::glib::HwGLIB::HwGLIB(std::string const& glibDevice,
 //   // setLogLevelTo(uhal::Error());  // Minimise uHAL logging
 
 //   for (unsigned li = 0; li < N_GTX; ++li) {
-//     b_links[li] = false;
 //     AMCIPBusCounters tmpGTXCounter;
 //     m_ipBusCounters.push_back(tmpGTXCounter);
 //   }

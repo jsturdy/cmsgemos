@@ -16,28 +16,16 @@ namespace gem {
       public:
 
         /**
-         * @struct AMCIPBusCounters
+         * @struct AMCIPBusCounters FIXME UPDATE FOR V3
          * @brief This structure stores retrieved counters related to the GenericAMC IPBus transactions
-         * @var AMCIPBusCounters::OptoHybridStrobe
-         * OptoHybridStrobe is a counter for the number of errors on the tracking data link
-         * @var AMCIPBusCounters::OptoHybridAck
-         * OptoHybridAck is a counter for the number of errors on the trigger data link
-         * @var AMCIPBusCounters::TrackingStrobe
-         * TrackingStrobe is a counter for the number of errors on the tracking data link
-         * @var AMCIPBusCounters::TrackingAck
-         * TrackingAck is a counter for the number of errors on the trigger data link
-         * @var AMCIPBusCounters::CounterStrobe
-         * CounterStrobe is a counter for the number of errors on the tracking data link
-         * @var AMCIPBusCounters::CounterAck
-         * CounterAck is a counter for the number of errors on the trigger data link
          */
         typedef struct AMCIPBusCounters {
-          uint32_t OptoHybridStrobe;
-          uint32_t OptoHybridAck   ;
-          uint32_t TrackingStrobe  ;
-          uint32_t TrackingAck     ;
-          uint32_t CounterStrobe   ;
-          uint32_t CounterAck      ;
+          uint32_t OptoHybridStrobe; ///< OptoHybridStrobe is a counter for the number of errors on the tracking data link
+          uint32_t OptoHybridAck   ; ///< OptoHybridAck is a counter for the number of errors on the trigger data link
+          uint32_t TrackingStrobe  ; ///< TrackingStrobe is a counter for the number of errors on the tracking data link
+          uint32_t TrackingAck     ; ///< TrackingAck is a counter for the number of errors on the trigger data link
+          uint32_t CounterStrobe   ; ///< CounterStrobe is a counter for the number of errors on the tracking data link
+          uint32_t CounterAck      ; ///< CounterAck is a counter for the number of errors on the trigger data link
 
         AMCIPBusCounters() :
           OptoHybridStrobe(0),OptoHybridAck(0),
@@ -747,9 +735,6 @@ namespace gem {
         std::vector<AMCIPBusCounters> m_ipBusCounters; /** for each gtx, IPBus counters */
 
       protected:
-        //GenericAMCMonitor *monGenericAMC_;
-
-        bool b_links[gem::hw::utils::N_GTX]; // have to figure out how to make this dynamic, or if we can just drop it... FIXME
         uint32_t m_links;    ///< Connected links mask
         uint32_t m_maxLinks; ///< Maximum supported OptoHybrids as reported by the firmware
 
