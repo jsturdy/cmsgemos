@@ -296,20 +296,140 @@ uint32_t gem::hw::optohybrid::HwOptoHybrid::getConnectedVFATMask(bool update)
 }
 
 
-void gem::hw::optohybrid::HwOptoHybrid::setVFATsToDefaults()
+std::vector<uint32_t> gem::hw::optohybrid::HwOptoHybrid::readOptoHybridConfig(bool const useRAM)
 {
-  CMSGEMOS_WARN("HwOptoHybrid::setVFATsToDefaults functionality is replaced with HwOptoHybrid::configureVFATs");
-  configureVFATs();
+  try {
+    if (useRAM) {
+      // FIXME currently not implemented, needs amc library, do we want?
+      req = wisc::RPCMsg("optohybrid.readOptoHybridConfig");
+      req.set_word("ohN",   static_cast<uint32_t>(m_link));
+    } else {
+      req = wisc::RPCMsg("optohybrid.readOptoHybridConfig");
+      req.set_word("ohN",   static_cast<uint32_t>(m_link));
+    }
+
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwOptoHybrid::readOptoHybridConfiguration");
+    std::vector<uint32_t> config;
+    config.resize(rsp.get_binarydata_size("config"));
+    rsp.get_binarydata("config", config.data(), config.size());
+    return config;
+  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::readOptoHybridConfiguration", gem::hw::optohybrid::exception::Exception);
+}
+
+std::vector<uint32_t> gem::hw::optohybrid::HwOptoHybrid::readVFATConfig(uint8_t const vfatN,
+                                                                        bool const useRAM)
+{
+  try {
+    if (useRAM) {
+      // FIXME currently not implemented, needs amc library, do we want?
+      req = wisc::RPCMsg("vfat3.readVFAT3Config");
+      req.set_word("ohN",   static_cast<uint32_t>(m_link));
+      req.set_word("vfatN", static_cast<uint32_t>(vfatN));
+    } else {
+      req = wisc::RPCMsg("vfat3.readVFAT3Config");
+      req.set_word("ohN",   static_cast<uint32_t>(m_link));
+      req.set_word("vfatN", static_cast<uint32_t>(vfatN));
+    }
+
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwOptoHybrid::readVFATConfiguration");
+    std::vector<uint32_t> config;
+    config.resize(rsp.get_binarydata_size("config"));
+    rsp.get_binarydata("config", config.data(), config.size());
+    return config;
+  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::readVFATConfiguration", gem::hw::optohybrid::exception::Exception);
+}
+
+std::vector<uint32_t> gem::hw::optohybrid::HwOptoHybrid::readAllVFATsConfig(bool const useRAM)
+{
+  std::vector<uint32_t> config;
+  for (size_t vfat = 0; vfat < 24; ++vfat) {
+    std::vector<uint32_t> vfatcfg = readVFATConfig(vfat, useRAM);
+    // config.resize((vfat+1)*vfatcfg.size());
+    // std::copy_n(vfatcfg.data(), config.begin()+(vfat*vfatcfg.size()));
+    config.reserve((vfat+1)*vfatcfg.size());
+    config.insert(std::end(config), std::begin(vfatcfg), std::end(vfatcfg));
+  }
+  return config;
+}
+
+std::vector<uint32_t> gem::hw::optohybrid::HwOptoHybrid::readGBTConfig(uint8_t const gbtN,
+                                                                       bool const useRAM)
+{
+  try {
+    if (useRAM) {
+      // FIXME currently not implemented, needs amc library, do we want?
+      req = wisc::RPCMsg("gbt.readGBTConfig");
+      req.set_word("ohN",  static_cast<uint32_t>(m_link));
+      req.set_word("gbtN", static_cast<uint32_t>(gbtN));
+    } else {
+      req = wisc::RPCMsg("gbt.readGBTConfig");
+      req.set_word("ohN",  static_cast<uint32_t>(m_link));
+      req.set_word("gbtN", static_cast<uint32_t>(gbtN));
+    }
+
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwOptoHybrid::readGBTConfiguration");
+    std::vector<uint32_t> config;
+    config.resize(rsp.get_binarydata_size("config"));
+    rsp.get_binarydata("config", config.data(), config.size());
+    return config;
+  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::readGBTConfiguration", gem::hw::optohybrid::exception::Exception);
+}
+
+std::vector<uint32_t> gem::hw::optohybrid::HwOptoHybrid::readAllGBTsConfig(bool const useRAM)
+{
+  std::vector<uint32_t> config;
+  for (size_t gbt = 0; gbt < 3; ++gbt) {
+    std::vector<uint32_t> gbtcfg = readGBTConfig(gbt, useRAM);
+    // config.resize((gbt+1)*gbtcfg.size());
+    // std::copy_n(gbtcfg.data(), config.begin()+(gbt*gbtcfg.size()));
+    config.reserve((gbt+1)*gbtcfg.size());
+    config.insert(std::end(config), std::begin(gbtcfg), std::end(gbtcfg));
+  }
+  return config;
+}
+
+// std::vector<uint32_t> gem::hw::optohybrid::HwOptoHybrid::readHWConfig(bool const useRAM)
+// {
+// }
+
+void gem::hw::optohybrid::HwOptoHybrid::configureVFATs(std::vector<uint32_t> const& vfatcfg,
+                                                       bool const useRAM)
+{
+  uint32_t const *config = nullptr;
+  uint32_t  cfg_sz = 0;
+
+  if (!useRAM && vfatcfg.size() > 0) {
+    config = vfatcfg.data();
+    cfg_sz = vfatcfg.size();
+  }
+
+  configureVFATs(config, cfg_sz, useRAM);
 }
 
 
-void gem::hw::optohybrid::HwOptoHybrid::configureVFATs()
+void gem::hw::optohybrid::HwOptoHybrid::configureVFATs(uint32_t const *config, size_t const cfg_sz,
+                                                       bool const useRAM)
 {
   try {
     req = wisc::RPCMsg("vfat3.configureVFAT3s");
-    req.set_word("ohN", static_cast<uint32_t>(m_link));
+    req.set_word("ohN",      static_cast<uint32_t>(m_link));
     req.set_word("vfatMask", ~m_connectedMask); // FIXME REMOVE
-    req.set_word("useRAM", false); // FIXME false until RAM loading is implemented
+
+    if (useRAM) {
+      req.set_word("useRAM", useRAM);
+    } else if (config != nullptr) {
+      req.set_binarydata("vfatcfg", config, cfg_sz);
+    }
+
     try {
       rsp = rpc.call_method(req);
     } STANDARD_CATCH;
@@ -318,89 +438,74 @@ void gem::hw::optohybrid::HwOptoHybrid::configureVFATs()
 }
 
 
-void gem::hw::optohybrid::HwOptoHybrid::setVFATsToDefaults(std::map<std::string, uint16_t> const& regvals)
+void gem::hw::optohybrid::HwOptoHybrid::configureGBT(uint8_t const gbtID,
+                                                     std::array<const uint32_t, 92> const& gbtcfg,
+                                                     bool const useRAM)
 {
-  CMSGEMOS_WARN("HwOptoHybrid::setVFATsToDefaults functionality is replaced with HwOptoHybrid::configureVFATs");
-  configureVFATs(regvals);
-}
+  uint32_t const *config = nullptr;
+  uint32_t  cfg_sz = 0;
 
-void gem::hw::optohybrid::HwOptoHybrid::configureVFATs(std::map<std::string, uint16_t> const& regvals)
-{
-  try {
-    req = wisc::RPCMsg("vfat3.configureVFAT3s");
-    req.set_word("ohN", static_cast<uint32_t>(m_link));
-    // req.set_word("vfatMask", m_connectedMask); // FIXME REMOVE
-    req.set_word("useRAM", false);
-    std::array<uint32_t,24*74> cfgdata{0};
-    req.set_binarydata("config", cfgdata.data(), cfgdata.size());
-    try {
-      rsp = rpc.call_method(req);
-    } STANDARD_CATCH;
-    checkRPCResponse("HwOptoHybrid::configureVFATs");
-  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::configureVFATs", gem::hw::optohybrid::exception::Exception);
+  if (!useRAM && gbtcfg.size() > 0) { // FIXME size of an array will *always* be > 0, but OK?
+    config = gbtcfg.data();
+    cfg_sz = gbtcfg.size();
+  }
+
+  configureGBT(gbtID, config, cfg_sz, useRAM);
 }
 
 
-void gem::hw::optohybrid::HwOptoHybrid::configureGBT(uint8_t const& gbtID, uint32_t const* gbtcfg)
+void gem::hw::optohybrid::HwOptoHybrid::configureGBT(uint8_t const gbtID,
+                                                     uint32_t const *gbtcfg, size_t const cfg_sz,
+                                                     bool const useRAM)
 {
   try {
     req = wisc::RPCMsg("gbt.writeGBTConfig");
-    req.set_word("ohN",  static_cast<uint32_t>(m_link));
-    req.set_word("gbtN", static_cast<uint32_t>(gbtID));
-    req.set_word("useRAM", false);
-    // std::array<uint32_t, 92> cfgdata{0};
-    // cfgdata.resize(3*92);
-    // req.set_binarydata("config", cfgdata.data(), cfgdata.size());
-    req.set_binarydata("config", gbtcfg, 92); // FIXME how to guarantee size?
-    /**
-    // or, with one blob per GBTx
-    std::array<std::array<uint32_t, 92>, 3> cfgdata{};
-    req.set_binarydata("gbt0", cfgdata.at(0).data(), cfgdata.at(0).size());
-    req.set_binarydata("gbt1", cfgdata.at(1).data(), cfgdata.at(1).size());
-    req.set_binarydata("gbt2", cfgdata.at(2).data(), cfgdata.at(2).size());
-    */
+    req.set_word("ohN",    static_cast<uint32_t>(m_link));
+    req.set_word("gbtN",   static_cast<uint32_t>(gbtID));
+    req.set_word("useRAM", useRAM);
+
+    if (gbtcfg != nullptr)
+      req.set_binarydata("config", gbtcfg, cfg_sz);
+
     try {
       rsp = rpc.call_method(req);
     } STANDARD_CATCH;
-    checkRPCResponse("HwOptoHybrid::configureAllGBTs");
-  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::configureAllGBTs", gem::hw::optohybrid::exception::Exception);
+    checkRPCResponse("HwOptoHybrid::configureGBT");
+  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::configureGBT", gem::hw::optohybrid::exception::Exception);
 }
 
 
-void gem::hw::optohybrid::HwOptoHybrid::configureGBT(uint8_t const& gbtID, std::array<const uint32_t, 92> const& gbtcfg)
+void gem::hw::optohybrid::HwOptoHybrid::configureGBTs(std::array<const uint32_t, 3*92> const& gbtcfg,
+                                                      bool const useRAM)
 {
-  configureGBT(gbtID, gbtcfg.data());
+  uint32_t const *config = nullptr;
+  uint32_t  cfg_sz = 0;
+
+  if (!useRAM && gbtcfg.size() > 0) { // FIXME size of an array will *always* be > 0, but OK?
+    config = gbtcfg.data();
+    cfg_sz = gbtcfg.size();
+  }
+
+  configureGBTs(config, cfg_sz, useRAM);
 }
 
 
-void gem::hw::optohybrid::HwOptoHybrid::configureAllGBTs(uint32_t const* gbtcfg)
+void gem::hw::optohybrid::HwOptoHybrid::configureGBTs(uint32_t const *gbtcfg, size_t const cfg_sz,
+                                                      bool const useRAM)
 {
   try {
     req = wisc::RPCMsg("gbt.writeAllGBTConfigs");
-    req.set_word("ohN", static_cast<uint32_t>(m_link));
-    req.set_word("useRAM", false);
-    // std::array<uint32_t, 3*92> cfgdata{0};
-    // cfgdata.resize(3*92);
-    // req.set_binarydata("config", cfgdata.data(), cfgdata.size());
-    req.set_binarydata("config", gbtcfg, 3*92); // FIXME how to guarantee size?
-    /**
-    // or, with one blob per GBTx
-    std::array<std::array<uint32_t, 92>, 3> cfgdata{};
-    req.set_binarydata("gbt0", cfgdata.at(0).data(), cfgdata.at(0).size());
-    req.set_binarydata("gbt1", cfgdata.at(1).data(), cfgdata.at(1).size());
-    req.set_binarydata("gbt2", cfgdata.at(2).data(), cfgdata.at(2).size());
-    */
+    req.set_word("ohN",    static_cast<uint32_t>(m_link));
+    req.set_word("useRAM", useRAM);
+
+    if (gbtcfg != nullptr)
+      req.set_binarydata("config", gbtcfg, cfg_sz);
+
     try {
       rsp = rpc.call_method(req);
     } STANDARD_CATCH;
-    checkRPCResponse("HwOptoHybrid::configureAllGBTs");
-  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::configureAllGBTs", gem::hw::optohybrid::exception::Exception);
-}
-
-
-void gem::hw::optohybrid::HwOptoHybrid::configureAllGBTs(std::array<const uint32_t, 3*92> const& gbtcfg)
-{
-  configureAllGBTs(gbtcfg.data());
+    checkRPCResponse("HwOptoHybrid::configureGBTs");
+  } GEM_CATCH_RPC_ERROR("HwOptoHybrid::configureGBTs", gem::hw::optohybrid::exception::Exception);
 }
 
 

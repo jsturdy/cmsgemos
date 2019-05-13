@@ -338,15 +338,8 @@ void gem::hw::HwGenericAMC::configureDAQModule(bool enableZS, bool doPhaseShift,
     req.set_word("bc0LockPSMode",bc0LockPSMode);
     try {
       rsp = rpc.call_method(req);
-      try {
-        if (rsp.get_key_exists("error")) {
-          std::stringstream errmsg;
-          errmsg << rsp.get_string("error");
-          CMSGEMOS_ERROR("HwGenericAMC::configureDAQModule: " << errmsg.str());
-          XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-        }
-      } STANDARD_CATCH;
     } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::configureDAQModule");
   } GEM_CATCH_RPC_ERROR("HwGenericAMC::enableDAQLink", gem::hw::exception::Exception);
 }
 
@@ -357,15 +350,8 @@ void gem::hw::HwGenericAMC::enableDAQLink(uint32_t const& enableMask)
     req.set_word("enableMask",enableMask);
     try {
       rsp = rpc.call_method(req);
-      try {
-        if (rsp.get_key_exists("error")) {
-          std::stringstream errmsg;
-          errmsg << rsp.get_string("error");
-          CMSGEMOS_ERROR("HwGenericAMC::enableDAQLink: " << errmsg.str());
-          XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-        }
-      } STANDARD_CATCH;
     } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::enableDAQLink");
   } GEM_CATCH_RPC_ERROR("HwGenericAMC::enableDAQLink", gem::hw::exception::Exception);
 }
 
@@ -375,16 +361,9 @@ void gem::hw::HwGenericAMC::disableDAQLink()
     req = wisc::RPCMsg("amc.disableDAQLink");
     try {
       rsp = rpc.call_method(req);
-      try {
-        if (rsp.get_key_exists("error")) {
-          std::stringstream errmsg;
-          errmsg << rsp.get_string("error");
-          CMSGEMOS_ERROR("HwGenericAMC::disableDAQLink: " << errmsg.str());
-          XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-        }
-      } STANDARD_CATCH;
     } STANDARD_CATCH;
-  } GEM_CATCH_RPC_ERROR("HwGenericAMC::enableDAQLink", gem::hw::exception::Exception);
+    checkRPCResponse("HwGenericAMC::disableDAQLink");
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::disableDAQLink", gem::hw::exception::Exception);
 }
 
 void gem::hw::HwGenericAMC::setZS(bool en)
@@ -400,19 +379,13 @@ void gem::hw::HwGenericAMC::resetDAQLink(uint32_t const& davTO, uint32_t const& 
     req.set_word("ttsOverride", ttsOverride);
     try {
       rsp = rpc.call_method(req);
-      try {
-        if (rsp.get_key_exists("error")) {
-          std::stringstream errmsg;
-          errmsg << rsp.get_string("error");
-          XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-        }
-      } STANDARD_CATCH;
     } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::resetDAQLink");
     /*  FIXME alternative
     // should reraise gem::hw::exception::RPCMethodError as a result of the STANDARD_CATCH
     // turn this into a macro?
     } catch (...) {
-      handleRPCError("HwGenericAMC::enableDAQLink");
+      handleRPCError("HwGenericAMC::resetDAQLink");
       // https://stackoverflow.com/questions/3561659/how-can-i-abstract-out-a-repeating-try-catch-pattern-in-c
       // https://stackoverflow.com/questions/2466131/is-re-throwing-an-exception-legal-in-a-nested-try
       // https://stackoverflow.com/questions/13007793/is-a-macro-to-catch-a-set-of-exceptions-at-different-places-fine
@@ -420,7 +393,7 @@ void gem::hw::HwGenericAMC::resetDAQLink(uint32_t const& davTO, uint32_t const& 
       // https://codereview.stackexchange.com/questions/2484/generic-c-exception-catch-handler-macro
     }
      */
-  } GEM_CATCH_RPC_ERROR("HwGenericAMC::enableDAQLink", gem::hw::exception::Exception);
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::resetDAQLink", gem::hw::exception::Exception);
 }
 
 uint32_t gem::hw::HwGenericAMC::getDAQLinkControl()
@@ -623,14 +596,8 @@ void gem::hw::HwGenericAMC::ttcMMCMPhaseShift(bool relock, bool modeBC0, bool sc
     req.set_word("scan",    scan);
     try {
       rsp = rpc.call_method(req);
-      try {
-        if (rsp.get_key_exists("error")) {
-          std::stringstream errmsg;
-          errmsg << rsp.get_string("error");
-          XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-        }
-      } STANDARD_CATCH;
     } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::ttcMMCMPhaseShift");
   } GEM_CATCH_RPC_ERROR("HwGenericAMC::ttcMMCMPhaseShift", gem::hw::exception::Exception);
 }
 
@@ -641,15 +608,9 @@ int gem::hw::HwGenericAMC::checkPLLLock(uint32_t readAttempts)
     req.set_word("readAttempts", readAttempts);
     try {
       rsp = rpc.call_method(req);
-      try {
-        if (rsp.get_key_exists("error")) {
-          std::stringstream errmsg;
-          errmsg << rsp.get_string("error");
-          XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-        }
-      } STANDARD_CATCH;
-      return rsp.get_word("lockCnt");
     } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::checkPLLLock");
+    return rsp.get_word("lockCnt");
   } GEM_CATCH_RPC_ERROR("HwGenericAMC::checkPLLLock", gem::hw::exception::Exception);
 }
 
@@ -663,15 +624,9 @@ double gem::hw::HwGenericAMC::getMMCMPhaseMean(uint32_t readAttempts)
       req.set_word("reads", readAttempts);
       try {
         rsp = rpc.call_method(req);
-        try {
-          if (rsp.get_key_exists("error")) {
-            std::stringstream errmsg;
-            errmsg << rsp.get_string("error");
-            XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-          }
-        } STANDARD_CATCH;
-        return rsp.get_word("phase");
       } STANDARD_CATCH;
+      checkRPCResponse("HwGenericAMC::getMMCMPhaseMean");
+      return rsp.get_word("phase");
     } GEM_CATCH_RPC_ERROR("HwGenericAMC::getMMCMPhaseMean", gem::hw::exception::Exception);
   }
 }
@@ -692,15 +647,9 @@ double gem::hw::HwGenericAMC::getGTHPhaseMean(uint32_t readAttempts)
       req.set_word("reads", readAttempts);
       try {
         rsp = rpc.call_method(req);
-        try {
-          if (rsp.get_key_exists("error")) {
-            std::stringstream errmsg;
-            errmsg << rsp.get_string("error");
-            XCEPT_RAISE(gem::hw::exception::RPCMethodError, errmsg.str());
-          }
-        } STANDARD_CATCH;
-        return rsp.get_word("phase");
       } STANDARD_CATCH;
+      checkRPCResponse("HwGenericAMC::getGTHPhaseMean");
+      return rsp.get_word("phase");
     } GEM_CATCH_RPC_ERROR("HwGenericAMC::getGTHPhaseMean", gem::hw::exception::Exception);
   }
 }
@@ -950,4 +899,109 @@ void gem::hw::HwGenericAMC::linkReset(uint8_t const& gtx)
   CMSGEMOS_WARN("HwGenericAMC::linkReset: not yet implemented");
   linkCounterReset();
   return;
+}
+
+std::vector<uint32_t> gem::hw::HwGenericAMC::readOptoHybridConfRAM()
+{
+  std::vector<uint32_t> cfgRAM;
+  try {
+    req = wisc::RPCMsg("amc.readConfRAM");
+    // req.set_word("mask",         mask); // FIXME doesn't do anything currently
+    req.set_word("type",         0x2);  // FIXME get from ctp7_modules include
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::readOptoHybridConfRAM");
+    cfgRAM.resize(rsp.get_binarydata_size("confblob"));
+    rsp.get_binarydata("confblob", cfgRAM.data(), cfgRAM.size());
+    return cfgRAM;
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::readOptoHybridConfRAM", gem::hw::exception::Exception);
+}
+
+std::vector<uint32_t> gem::hw::HwGenericAMC::readVFATConfRAM()
+{
+  std::vector<uint32_t> cfgRAM;
+  try {
+    req = wisc::RPCMsg("amc.readConfRAM");
+    // req.set_word("mask",         mask); // FIXME doesn't do anything currently
+    req.set_word("type",         0x4);  // FIXME get from ctp7_modules include
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::readVFATConfRAM");
+    cfgRAM.resize(rsp.get_binarydata_size("confblob"));
+    rsp.get_binarydata("confblob", cfgRAM.data(), cfgRAM.size());
+    return cfgRAM;
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::readVFATConfRAM", gem::hw::exception::Exception);
+}
+
+std::vector<uint32_t> gem::hw::HwGenericAMC::readGBTConfRAM()
+{
+  std::vector<uint32_t> cfgRAM;
+  try {
+    req = wisc::RPCMsg("amc.readConfRAM");
+    // req.set_word("mask",         mask); // FIXME doesn't do anything currently
+    req.set_word("type",         0x1);  // FIXME get from ctp7_modules include
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::readGBTConfRAM");
+    cfgRAM.resize(rsp.get_binarydata_size("confblob"));
+    rsp.get_binarydata("confblob", cfgRAM.data(), cfgRAM.size());
+    return cfgRAM;
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::readGBTConfRAM", gem::hw::exception::Exception);
+}
+
+void gem::hw::HwGenericAMC::writeOptoHybridConfRAM(uint16_t const mask, uint32_t const *config, size_t const cfg_sz)
+{
+  try {
+    req = wisc::RPCMsg("amc.writeOptoHybridConfRAM");
+    req.set_word("mask",         mask);
+    req.set_binarydata("ohblob", config, cfg_sz);
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::writeOptoHybridConfRAM");
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::writeOptoHybridConfRAM", gem::hw::exception::Exception);
+}
+
+void gem::hw::HwGenericAMC::writeOptoHybridConfRAM(uint16_t const mask, std::vector<uint32_t> config)
+{
+  writeOptoHybridConfRAM(mask, config.data(), config.size());
+}
+
+void gem::hw::HwGenericAMC::writeVFATConfRAM(uint16_t const mask, uint32_t const *config, size_t const cfg_sz)
+{
+  try {
+    req = wisc::RPCMsg("amc.writeVFATConfRAM");
+    req.set_word("mask",           mask);
+    req.set_binarydata("vfatblob", config, cfg_sz);
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::writeVFATConfRAM");
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::writeVFATConfRAM", gem::hw::exception::Exception);
+}
+
+void gem::hw::HwGenericAMC::writeVFATConfRAM(uint16_t const mask, std::vector<uint32_t> config)
+{
+  writeVFATConfRAM(mask, config.data(), config.size());
+}
+
+void gem::hw::HwGenericAMC::writeGBTConfRAM(uint16_t const mask, uint32_t const *config, size_t const cfg_sz)
+{
+  try {
+    req = wisc::RPCMsg("amc.writeGBTConfRAM");
+    req.set_word("mask",          mask);
+    req.set_binarydata("gbtblob", config, cfg_sz);
+    try {
+      rsp = rpc.call_method(req);
+    } STANDARD_CATCH;
+    checkRPCResponse("HwGenericAMC::writeGBTConfRAM");
+  } GEM_CATCH_RPC_ERROR("HwGenericAMC::writeGBTConfRAM", gem::hw::exception::Exception);
+}
+
+void gem::hw::HwGenericAMC::writeGBTConfRAM(uint16_t const mask, std::vector<uint32_t> config)
+{
+  writeGBTConfRAM(mask, config.data(), config.size());
 }

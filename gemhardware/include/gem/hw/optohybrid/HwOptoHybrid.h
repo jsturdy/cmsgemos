@@ -119,7 +119,7 @@ namespace gem {
            *        - 0 means the VFAT will *not* be masked
            *        - 1 means the VFAT *will* be masked
            */
-          void setVFATMask(uint32_t const mask);
+          void setVFATMask(uint32_t mask);
 
           /**
            * @brief Returns VFATs to the 0 run mode
@@ -131,7 +131,7 @@ namespace gem {
            * @brief Set the S-bit mask
            * @param uint32_t mask s-bits coming from specific GEB slots
            */
-          void setSBitMask(uint32_t const mask);
+          void setSBitMask(uint32_t mask);
 
           /**
            * @brief Read the S-bit mask
@@ -536,36 +536,128 @@ namespace gem {
           uint32_t getConnectedVFATMask(bool update=false);
 
           /**
-           * @brief Sends a write request for all setup registers on each connected VFAT
-           *        Uses the settings stored in the CTP7 BRAM
+           * @brief Reads the current OptoHybrid configuration
+           *
+           * @param useRAM controls whether the configuration is read from the BLASTER RAM
+           *        or directly from the registers.
+           * @returns a vector of 32-bit unsigned values corresponding to the <value,address> of each of the
+           *          configuration registers
            */
-          void setVFATsToDefaults();
-          void configureVFATs();
+          std::vector<uint32_t> readOptoHybridConfig(bool useRAM=false);
+
+          /**
+           * @brief Reads the configuration of the specified VFAT
+           *
+           * @param vfatN specifies the VFAT of which to read the configuration
+           * @param useRAM controls whether the configuration is read from the BLASTER RAM
+           *        or directly from the registers.
+           * @returns a vector of 32-bit unsigned values corresponding to the values of each of the
+           *          configuration registers
+           */
+          std::vector<uint32_t> readVFATConfig(uint8_t vfatN, bool useRAM=false);
+
+          /**
+           * @brief Reads the configuration of all connected VFATs
+           *
+           * @param useRAM controls whether the configuration is read from the BLASTER RAM
+           *        or directly from the registers.
+           * @returns a vector of 32-bit unsigned values corresponding to the values of each of the
+           *          configuration registers.
+           *          Empty data is returned for disconnected VFATs
+           */
+          std::vector<uint32_t> readAllVFATsConfig(bool useRAM=false);
+
+          /**
+           * @brief Reads the configuration of the specified GBT
+           *
+           * @param gtbN specifies the GBT of which to read the configuration
+           * @param useRAM controls whether the configuration is read from the BLASTER RAM
+           *        or directly from the registers.
+           * @returns a vector of 32-bit unsigned values corresponding to the values of each of the
+           *          configuration registers
+           */
+          std::vector<uint32_t> readGBTConfig(uint8_t gtbN, bool useRAM=false);
+
+          /**
+           * @brief Reads the configuration of all connected GBTs
+           *
+           * @param useRAM controls whether the configuration is read from the BLASTER RAM
+           *        or directly from the registers.
+           * @returns a vector of 32-bit unsigned values corresponding to the values of each of the
+           *          configuration registers.
+           */
+          std::vector<uint32_t> readAllGBTsConfig(bool useRAM=false);
+
+          /* /\** */
+          /*  * @brief Reads the current HW configuration */
+          /*  * */
+          /*  * @param useRAM controls whether the configuration is read from the BLASTER RAM */
+          /*  *        or directly from the registers. */
+          /*  * @returns a vector of 32-bit unsigned values corresponding to the <value,address> of each of the */
+          /*  *          configuration registers */
+          /*  *\/ */
+          /* std::vector<uint32_t> readHWConfig(bool useRAM=false); */
+
+          /**
+           * @brief Configure the OptoHybrid registers
+           *
+           * @param regvals is a map between register name and value
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureOptoHybrid(std::map<std::string, uint32_t> const& regvals, bool useRAM=false);
+
+          /**
+           * @brief Sends a write request for all setup registers on a given VFAT
+           *
+           * @description There are three possible modes: useRAM, use local files, use sent data
+           *              if !useRAM
+           *                if data == nullptr/empty, use local files
+           *                else use sent data
+           *              else use RAM data
+           *
+           * @param vfatN is the VFAT to which the configuration will be written
+           * @param vfatcfg is an std::vector<uint32_t> of VFAT values to be written
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureVFAT(uint8_t vfatN, std::vector<uint32_t> const& vfatcfg, bool useRAM=false);
 
           /**
            * @brief Sends a write request for all setup registers on each VFAT specified by the mask
-           * @param std::map<std::string, uint16_t> map of VFAT register name to value to broadcast
+           *
+           * @description There are three possible modes: useRAM, use local files, use sent data
+           *              if !useRAM
+           *                if data == nullptr/empty, use local files
+           *                else use sent data
+           *              else use RAM data
+           *
+           * @param vfatcfg is an std::vector<uint32_t> of VFAT values to be written
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
            */
-          void setVFATsToDefaults(std::map<std::string, uint16_t> const& regvals);
-          void configureVFATs(std::map<std::string, uint16_t> const& regvals);
+          void configureVFATs(std::vector<uint32_t> const& vfatcfg, bool useRAM=false);
 
           /**
            * @brief Sends a write request for all configuration registers on all GBTx chips
            * @param gbtID is the GBTx to which the configuration will be written
-           * @param gbtcfg is a pointer to an array of 92 32-bit words
+           * @param gbtcfg is a pointer to an array of 92 32-bit words OR
            * @param gbtcfg is an array of 92 32-bit words
+           * @param cfg_sz is the size of the array
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
            */
 
-          void configureGBT(uint8_t const& gbtID, uint32_t const* gbtcfg); // FIXME, make private
-          void configureGBT(uint8_t const& gbtID, std::array<const uint32_t, 92> const& gbtcfg);
+          void configureGBT(uint8_t gbtID, std::array<uint32_t const, 92> const& gbtcfg, bool useRAM=false);
 
           /**
            * @brief Sends a write request for all configuration registers on all GBTx chips
-           * @param gbtcfg is a pointer to an array of 3*92 32-bit words
+           * @param gbtcfg is a pointer to an array of 3*92 32-bit words OR
            * @param gbtcfg is an array of 3*92 32-bit words
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
            */
-          void configureAllGBTs(uint32_t const* gbtcfg); // FIXME, make private
-          void configureAllGBTs(std::array<const uint32_t, 3*92> const& gbtcfg);
+          void configureGBTs(std::array<uint32_t const, 3*92> const& gbtcfg, bool useRAM=false);
 
         protected:
 
@@ -575,8 +667,8 @@ namespace gem {
           HwOptoHybrid();
 
           // Prevent copying of HwOptoHybrid objects
-          HwOptoHybrid(const HwOptoHybrid& other);      ///< prevents construction-copy
-          HwOptoHybrid& operator=(const HwOptoHybrid&); ///< prevents copying
+          HwOptoHybrid(HwOptoHybrid const& other)=delete;      ///< prevents construction-copy
+          HwOptoHybrid& operator=(HwOptoHybrid const&)=delete; ///< prevents copying
 
           bool b_is_initial;         ///< Don't query HW for certain lookups and use cached values FIXME OBSOLETE?
           uint8_t m_link;            ///< Link on the AMC the OptoHybrid is connected to
@@ -584,6 +676,57 @@ namespace gem {
           uint32_t m_connectedMask;  ///< mask where a '1' means VFAT is connected FIXME OBSOLETE?
 
           std::vector<std::pair<uint8_t, uint32_t> > m_chipIDs; ///< mapping of VFAT position to chipID
+
+          ///< GBT config
+          ///< VFAT config
+          ///< OH config
+
+          /**
+           * @brief Sends a configure request to all registers on the OptoHybrid
+           * @param config is a pointer to an array of 32-bit words containing the configuration
+           * @param cfg_sz is the size of the array?
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureOptoHybrid(uint32_t const *config, size_t cfg_sz, bool useRAM=false);
+
+          /**
+           * @brief Sends a configure request to all registers on the specified VFAT
+           * @param vfatN specifies the VFAT that will be configured
+           * @param config is a pointer to an array of 74 32-bit words containing the configuration
+           * @param cfg_sz is the size of the array FIXME necessary?
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureVFAT(uint8_t vfatN, uint32_t const *config, size_t cfg_sz, bool useRAM=false);
+
+          /**
+           * @brief Sends a configure request for all registers on all connected VFAT
+           * @param config is a pointer to an array of 24*74 32-bit words containing the configuration
+           * @param cfg_sz is the size of the array
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureVFATs(uint32_t const *config, size_t cfg_sz, bool useRAM=false);
+
+          /**
+           * @brief Sends a configure request for all registers on the specified GBTx
+           * @param gbtID specifies the GBT that will be configured
+           * @param config is a pointer to an array of 92 32-bit words containing the configuration
+           * @param cfg_sz is the size of the array
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureGBT(uint8_t gbtID, uint32_t const *gbtcfg, size_t cfg_sz, bool useRAM=false);
+          /**
+           * @brief Sends a configure request for all registers on all connected GBTx
+           * @param config is a pointer to an array of 3*92 32-bit words containing the configuration
+           * @param cfg_sz is the size of the array
+           * @param useRAM controls whether the configuration should be read from the BLASTER RAM
+           *        or directly from the blob provided
+           */
+          void configureGBTs(uint32_t const *gbtcfg, size_t cfg_sz, bool useRAM=false);
+
         };  // class HwOptoHybrid
     }  // namespace gem::hw::optohybrid
   }  // namespace gem::hw

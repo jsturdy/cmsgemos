@@ -14,6 +14,14 @@
 
 #include "gem/hw/optohybrid/exception/Exception.h"
 
+#include "gem/onlinedb/ConfigurationManager.h"
+#include "gem/onlinedb/AMC13Configuration.h"
+#include "gem/onlinedb/AMCConfiguration.h"
+#include "gem/onlinedb/OHv3Configuration.h"
+#include "gem/onlinedb/VFAT3ChipConfiguration.h"
+#include "gem/onlinedb/VFAT3ChannelConfiguration.h"
+// #include "gem/onlinedb/GBTConfiguration.h" // FIXME not yet available
+
 #include "gem/hw/vfat/HwVFAT2.h"
 #include "gem/hw/utils/GEMCrateUtils.h"
 
@@ -320,7 +328,9 @@ void gem::hw::optohybrid::OptoHybridManager::configureAction()
         }
 
         CMSGEMOS_INFO("Reading back values after setting defaults:");
-        optohybrid->configureVFATs();
+        std::vector<uint32_t> config;
+        // FIXME currntly use files on the CTP7
+        optohybrid->configureVFATs(config, false);
         // auto vfatcfg = optohybrid->readVFATsConfiguration();
         // for (auto const& cfg : vfatcfg) {
         //   for (auto const& r : cfg) {
@@ -684,4 +694,137 @@ void gem::hw::optohybrid::OptoHybridManager::createOptoHybridInfoSpaceItems(is_t
   is_optohybrid->createUInt32("GTX_DataPackets",        optohybrid->getFirmwareVersion(), NULL, GEMUpdateType::HW32);
   is_optohybrid->createUInt32("GBT_TrackingLinkErrors", optohybrid->getFirmwareVersion(), NULL, GEMUpdateType::HW32);
   is_optohybrid->createUInt32("GBT_DataPackets",        optohybrid->getFirmwareVersion(), NULL, GEMUpdateType::HW32);
+}
+
+void gem::hw::optohybrid::OptoHybridManager::fillOHv3Config(uint8_t const shelf, uint8_t const slot,
+                                                            uint8_t const ohN)
+{
+  auto lock  = gem::onlinedb::ConfigurationManager::makeEditLock();
+  auto ohCfg = gem::onlinedb::ConfigurationManager::getConfiguration(lock)
+    // ->getAMC13Config(shelf)
+    .at(shelf)
+    ->getAMCConfig(slot)
+    ->getOHConfig(ohN);
+
+  auto optohybrid     = m_optohybrids.at(slot).at(ohN);
+  auto const& cfgData = optohybrid->readOptoHybridConfig();
+
+  // put cfgData into ohCfg via BLOB or via accessors?
+
+  uint8_t cfgIdx = 0;
+  ohCfg->setBxnOffset(cfgData.at(cfgIdx++)>>16);
+  // ohCfg->setBXNOffset(cfgData.at(cfgIdx++)>>16);
+  ohCfg->setTrigCtrlVfatMask(cfgData.at(cfgIdx++));
+  // ohCfg->setTrigCtrlVFATMask(cfgData.at(cfgIdx++));
+
+  // HDMI s-bit config
+  uint8_t shift  = 0;
+  for (uint8_t sb = 0; sb < 8; ++sb) {
+    if (shift > 30) {
+      ++cfgIdx; // or += 2 if addresses are included?
+      shift = 0;
+    }
+    ohCfg->setHDMISBitSel(sb, static_cast<uint32_t>((cfgData.at(cfgIdx)>>shift)&0x1f));
+    shift += 5;
+  }
+  for (uint8_t sb = 0; sb < 8; ++sb) {
+    if (shift > 30) {
+      ++cfgIdx; // or += 2 if addresses are included?
+      shift = 0;
+    }
+    ohCfg->setHDMISBitMode(sb, static_cast<uint32_t>((cfgData.at(cfgIdx)>>shift)&0x3));
+    shift += 2;
+  }
+
+  // s-bit TAP delay config
+  cfgIdx += 1; // or += 2 if addresses are included?
+  shift   = 0;
+  for (uint8_t vf = 0; vf < 24; ++vf) {
+    for (uint8_t sb = 0; sb < 8; ++sb) {
+      if (shift > 30) {
+        ++cfgIdx; // or += 2 if addresses are included?
+        shift = 0;
+      }
+      ohCfg->setTrigTapDelay(vf, sb, static_cast<uint32_t>((cfgData.at(cfgIdx)>>shift)&0x1f));
+      shift += 5;
+    }
+  }
+
+  // SOT TAP delay config
+  cfgIdx += 1; // or += 2 if addresses are included?
+  shift   = 0;
+  for (uint8_t vf = 0; vf < 24; ++vf) {
+    if (shift > 30) {
+      ++cfgIdx; // or += 2 if addresses are included?
+      shift = 0;
+    }
+    ohCfg->setSotTapDelay(vf, static_cast<uint32_t>((cfgData.at(cfgIdx)>>shift)&0x1f));
+    shift += 5;
+  }
+}
+
+void gem::hw::optohybrid::OptoHybridManager::fillVFATConfig(uint8_t const shelf, uint8_t const slot,
+                                                            uint8_t const ohN, uint8_t const vfatN)
+{
+  auto lock    = gem::onlinedb::ConfigurationManager::makeEditLock();
+  auto vfatCfg = gem::onlinedb::ConfigurationManager::getConfiguration(lock)
+    // ->getAMC13Config(shelf)
+    .at(shelf)
+    ->getAMCConfig(slot)
+    ->getOHConfig(ohN)
+    ->getVFATConfig(vfatN);
+  auto vfatCfgChan = vfatCfg->getChannelConfiguration();
+
+  auto optohybrid     = m_optohybrids.at(slot).at(ohN);
+  auto const& cfgData = optohybrid->readVFATConfig(vfatN);
+
+  // FIXME inelegant, but functinoal...
+  // loop over channel register values
+  size_t reg = 0;
+  for (auto const& cfg : cfgData) {
+    if (reg < 128/2) {  // Channel registers are the first 64 registers
+      vfatCfgChan.set(reg,       gem::onlinedb::VFAT3ChannelConfiguration::ChannelRegisterValue({0xffff&(cfg)}));
+      vfatCfgChan.set((reg++)+1, gem::onlinedb::VFAT3ChannelConfiguration::ChannelRegisterValue({0xffff&(cfg>>16)}));
+    } else {  // Chip registers are the last 10 registers
+      break;
+    }
+  }
+
+  // FIXME inelegant, but functinoal...
+  gem::onlinedb::detail::RegisterData data;
+  data["GLB_LOGIC_CTRL"]        = 0xffff&(cfgData.at(reg));
+  data["GLB_DATA_CTRL"]         = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_FE_CTRL"]           = 0xffff&(cfgData.at(reg));
+  data["GLB_CFD_CTRL"]          = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_MON_CTRL"]          = 0xffff&(cfgData.at(reg));
+  data["GLB_IREF_CTRL"]         = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_THRESHOLD_CTRL"]    = 0xffff&(cfgData.at(reg));
+  data["GLB_HYSTERISIS_CTRL"]   = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_LATENCY_CTRL"]      = 0xffff&(cfgData.at(reg));
+  data["GLB_CAL0_CFG_CTRL"]     = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_CAL1_CFG_CTRL"]     = 0xffff&(cfgData.at(reg));
+  data["GLB_CFD_BIAS_CTRL"]     = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_PREAMP_BIAS_CTRL0"] = 0xffff&(cfgData.at(reg));
+  data["GLB_PREAMP_BIAS_CTRL1"] = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_SHAPER_BIAS_CTRL0"] = 0xffff&(cfgData.at(reg));
+  data["GLB_SHAPER_BIAS_CTRL1"] = 0xffff&(cfgData.at(reg++)>>16);
+  data["GLB_SD_BIAS_CTRL"]      = 0xffff&(cfgData.at(reg));
+  vfatCfg->readRegisterData(data);
+}
+
+void gem::hw::optohybrid::OptoHybridManager::fillGBTConfig(uint8_t const shelf, uint8_t const slot,
+                                                           uint8_t const ohN, uint8_t const gbtN)
+{
+  auto lock     = gem::onlinedb::ConfigurationManager::makeEditLock();
+  // auto & gbtCfg = gem::onlinedb::ConfigurationManager::getConfiguration(lock)
+  //   // ->getAMC13Config(shelf)
+  //   .at(shelf)
+  //   ->getAMCConfig(slot)
+  //   ->getOHConfig(ohN)
+  //   ->getGBTConfig(gbtN);
+
+  auto&& optohybrid = m_optohybrids.at(slot).at(ohN);
+  auto&& cfgData    = optohybrid->readGBTConfig(gbtN);
+
+  // put cfgData into gbtCfg via BLOB or via accessors?
 }

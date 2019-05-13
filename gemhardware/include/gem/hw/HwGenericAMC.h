@@ -74,7 +74,7 @@ namespace gem {
          *        or the GEM_AMC board ID
          * @returns the AMC board ID as a std::string
          */
-        virtual std::string getBoardID(bool const legacy=false);
+        virtual std::string getBoardID(bool legacy=false);
 
         /**
          * @brief Read the board ID register (should be reimplemented in derived HW, e.g., GLIB)
@@ -82,7 +82,7 @@ namespace gem {
          *        or the GEM_AMC board ID (0xbeef as uint32_t)
          * @returns the AMC board ID as 32 bit unsigned value
          */
-        virtual uint32_t getBoardIDRaw(bool const legacy=false);
+        virtual uint32_t getBoardIDRaw(bool legacy=false);
 
         /**
          * @brief Read the system ID register (should be reimplemented in derived HW, e.g., GLIB)
@@ -90,7 +90,7 @@ namespace gem {
          *        or the GEM_AMC system ID
          * @returns the AMC system ID as a std::string
          */
-        virtual std::string getSystemID(bool const legacy=false);
+        virtual std::string getSystemID(bool legacy=false);
 
         /**
          * @brief Read the system ID register (should be reimplemented in derived HW, e.g., GLIB)
@@ -98,7 +98,7 @@ namespace gem {
          *        or the GEM_AMC board type (0x1 as uint32_t)
          * @returns the AMC system ID as 32 bit unsigned value
          */
-        virtual uint32_t getSystemIDRaw(bool const legacy=false);
+        virtual uint32_t getSystemIDRaw(bool legacy=false);
 
         /**
          * @brief Check how many OptoHybrids the AMC FW can support
@@ -734,6 +734,60 @@ namespace gem {
 
         std::vector<AMCIPBusCounters> m_ipBusCounters; /** for each gtx, IPBus counters */
 
+        /***********************************/
+        /** BLASTER RAM public interface  **/
+        /***********************************/
+        /**
+         * @brief Read the OptoHybrid configuration from the BLASTER RAM
+         *
+         * @returns a vector of 32-bit words containing the OptoHybrid configuration space
+         */
+        std::vector<uint32_t> readOptoHybridConfRAM();
+
+        /**
+         * @brief Read the VFAT configuration from the BLASTER RAM
+         *
+         * @returns a vector of 32-bit words containing the VFAT configuration space
+         */
+        std::vector<uint32_t> readVFATConfRAM();
+
+        /**
+         * @brief Read the GBT configuration from the BLASTER RAM
+         *
+         * @returns a vector of 32-bit words containing the GBT configuration space
+         */
+        std::vector<uint32_t> readGBTConfRAM();
+
+        /**
+         * @brief Write the OptoHybrid configuration to the BLASTER RAM
+         *
+         * @param mask is a mask corresponding to the connected OptoHybrids.
+         *        0x0 and 0xfff will write the configuration for the full address space
+         * @param config is vector of 32-bit words containing the configuration
+         *        FIXME what is assumed about the structure of this blob?
+         */
+        void writeOptoHybridConfRAM(uint16_t mask, std::vector<uint32_t> config);
+
+        /**
+         * @brief Write the VFAT configuration to the BLASTER RAM
+         *
+         * @param mask is a mask corresponding to the connected OptoHybrids.
+         *        0x0 and 0xfff will write the configuration for the full address space
+         * @param config is vector of 32-bit words containing the configuration
+         *        FIXME what is assumed about the structure of this blob?
+         */
+        void writeVFATConfRAM(uint16_t mask, std::vector<uint32_t> config);
+
+        /**
+         * @brief Write all GBTx configurations to the BLASTER RAM
+         *
+         * @param mask is a mask corresponding to the connected OptoHybrids.
+         *        0x0 and 0xfff will write the configuration for the full address space
+         * @param config is vector of 32-bit words containing the configuration
+         *        FIXME what is assumed about the structure of this blob?
+         */
+        void writeGBTConfRAM(uint16_t mask, std::vector<uint32_t> config);
+
       protected:
         uint32_t m_links;    ///< Connected links mask
         uint32_t m_maxLinks; ///< Maximum supported OptoHybrids as reported by the firmware
@@ -754,9 +808,43 @@ namespace gem {
         HwGenericAMC();
 
         // Prevent copying of HwGenericAMC objects
-        HwGenericAMC(const HwGenericAMC& other);      // prevents construction-copy
-        HwGenericAMC& operator=(const HwGenericAMC&); // prevents copying
+        HwGenericAMC(HwGenericAMC const& other)=delete;      // prevents construction-copy
+        HwGenericAMC& operator=(HwGenericAMC const&)=delete; // prevents copying
 
+        /************************************/
+        /** BLASTER RAM private interface  **/
+        /************************************/
+        /**
+         * @brief Write the OptoHybrid configuration to the BLASTER RAM
+         *
+         * @param mask is a mask corresponding to the connected OptoHybrids.
+         *        0x0 and 0xfff will write the configuration for the full address space
+         * @param config is a pointer to an array of 32-bit words containing the configuration
+         *        FIXME what is assumed about the structure of this blob?
+         * @param cfg_sz is the size of the array
+         */
+        void writeOptoHybridConfRAM(uint16_t mask, uint32_t const *config, size_t cfg_sz); // FIXME make private
+        /**
+         * @brief Write the OptoHybrid configuration to the BLASTER RAM
+         *
+         * @param mask is a mask corresponding to the connected OptoHybrids.
+         *        0x0 and 0xfff will write the configuration for the full address space
+         * @param config is a pointer to an array of 32-bit words containing the configuration
+         *        FIXME what is assumed about the structure of this blob?
+         * @param cfg_sz is the size of the array
+         */
+        void writeVFATConfRAM(uint16_t mask, uint32_t const *config, size_t cfg_sz); // FIXME make private
+
+        /**
+         * @brief Write the OptoHybrid configuration to the BLASTER RAM
+         *
+         * @param mask is a mask corresponding to the connected OptoHybrids.
+         *        0x0 and 0xfff will write the configuration for the full address space
+         * @param config is a pointer to an array of 32-bit words containing the configuration
+         *        FIXME what is assumed about the structure of this blob?
+         * @param cfg_sz is the size of the array
+         */
+        void writeGBTConfRAM(uint16_t mask, uint32_t const *config, size_t cfg_sz); // FIXME make private
       };  // class HwGenericAMC
   }  // namespace gem::hw
 }  // namespace gem
