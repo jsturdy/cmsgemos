@@ -139,7 +139,7 @@ $(SUBPACKAGES.RUNTESTSCI): tests
 gemhwdevices: gemutils
 	$(MAKE) -C $(BUILD_HOME)/cmsgemos/gemhardware -f Makefile devices
 
-gemhwmanagers: gemutils gembase gemreadout gemhwdevices
+gemhwmanagers: gemutils gembase gemreadout gemonlinedb gemhwdevices
 	$(MAKE) -C $(BUILD_HOME)/cmsgemos/gemhardware -f Makefile managers
 
 gemhardware: gemhwdevices gemhwmanagers
