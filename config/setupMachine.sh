@@ -17,8 +17,8 @@ prompt_confirm() {
         case $REPLY in
             [yY]) echo ; return 0 ;;
             [nN]) echo ; return 1 ;;
-            [qQ]) echo ; exit 1 ;;
-            *) echo ; return 1 ;;
+            [qQ]) echo ; cd $curdir; exit 1 ;;
+            *)    echo ; return 1 ;;
         esac
     done 3<&0
 }
@@ -27,6 +27,7 @@ new_service() {
     if [ -z "$2" ] || [[ ! "$2" =~ ^("on"|"off") ]]
     then
         echo -e "\033[1;33mPlease specify a service to configure, and whether it should be enabled ('on') or not ('off')\033[0m"
+	cd $curdir
         return 1
     fi
 
@@ -65,12 +66,16 @@ new_system_group() {
     then
         echo -e "$0 $1 $2 $3"
         echo -e "\033[1;33mUsage: new_system_group <groupname> <gid>\033[0m"
+	cd $curdir
         return 1
     fi
 
     echo -e "\033[1;32mCreating group $1 with gid $2\033[0m"
     groupadd $1
     groupmod -g $2 $1
+
+    cd $curdir
+    return 0
 }
 
 new_system_user() {
@@ -78,6 +83,7 @@ new_system_user() {
     then
         echo -e "$0 $1 $2 $3 $4"
         echo -e "\033[1;33mUsage: new_system_user <username> <uid> <primary gid>\033[0m"
+	cd $curdir
         return 1
     fi
 
@@ -108,6 +114,9 @@ new_system_user() {
     fi
 
     passwd $1
+
+    cd $curdir
+    return 0
 }
 
 configure_interface() {
@@ -119,6 +128,7 @@ configure_interface() {
              "   type myst be one of:\n" \
              "     uTCA for uTCA on local network\n" \
              "     uFEDKIT for uFEDKIT on 10GbE\n"
+	cd $curdir
         return 1
     fi
 
@@ -196,6 +206,9 @@ configure_interface() {
 
     ## slc6
     # iptables
+
+    cd $curdir
+    return 0
 }
 
 ###### Main functions #####
@@ -203,56 +216,158 @@ configure_interface() {
 install_xdaq() {
     # Option 'x'
     # doesn't include SRPMS
-    wget https://svnweb.cern.ch/trac/cactus/export/HEAD/trunk/scripts/release/xdaq.${ostype}${osver}.x86_64.repo \
-         -O /etc/yum.repos.d/xdaq.repo
-    perl -pi -e 's|# ||g' /etc/yum.repos.d/xdaq.repo
+    repoBase="http://xdaq.web.cern.ch/xdaq/repo"
+    if [ "${osver}" = "6" ]
+    then
+	xdaqVer="13"
+	xdaqOS=${ostype}"x"
+	newStructure=0
+    elif [ "${osver}" = "7" ]
+    then
+	# choose from xdaq14, xdaq14.6, xdaq15 for CC7
+	xdaqOS=${ostype}
+        while true
+        do
+            read -r -n 1 -p "Select xDAQ version: 14 (1), 14.6 (2), 15 (3)\n" REPLY
+            case $REPLY in
+                [1]) echo "Installing xdaq 14 yum repo"
+		    xdaqVer="14"
+		    newStructure=0
+                    break
+                    ;;
+                [2]) echo "Installing xdaq 14.6 yum repo"
+                    repoDir=""
+		    xdaqVer="14"
+		    newStructure=1
+                    break
+                    ;;
+                [3]) echo "Installing xdaq 15 yum repo"
+                    repoDir="development/"
+		    xdaqVer="master"
+		    newStructure=1
+                    break
+                    ;;
+                [sS]) echo "Skipping $REPLY..." ; break ;;
+                [qQ]) echo "Quitting..." ; cd $curdir; return 0 ;;
+                *) printf "\033[31m %s \n\033[0m" "Invalid choice, please specify an xdaq version, press s(S) to skip, or q(Q) to quit";;
+            esac
+        done
+    fi
+
+    basePkgs=
+    workPkgs=
+    kernPkgs=
+    if [ "${newStructure}" == '0' ]
+    then
+        cat <<EOF >/etc/yum.repos.d/xdaq.repo
+[xdaq-base]
+name     = XDAQ Software Base
+baseurl  = ${repoBase}/${xdaqVer}/${xdaqOS}/x86_64/base/RPMS/
+enabled  = 1
+gpgcheck = 0
+
+[xdaq-updates]
+name     = XDAQ Software Updates
+baseurl  = ${repoBase}/${xdaqVer}/${xdaqOS}/x86_64/updates/RPMS/
+enabled  = 1
+gpgcheck = 0
+
+[xdaq-extras]
+name     = XDAQ Software Extras
+baseurl  = ${repoBase}/${xdaqVer}/${xdaqOS}/x86_64/extras/RPMS/
+enabled  = 1
+gpgcheck = 0
+
+[xdaq-kernel-modules]
+name     = XDAQ Kernel Modules
+baseurl  = ${repoBase}/${xdaqVer}/${xdaqOS}/x86_64/kernel_modules/RPMS/
+enabled  = 1
+gpgcheck = 0
+EOF
+
+    basePkgs=( extern_coretools coretools extern_powerpack powerpack )
+    workPkgs=( database_worksuite general_worksuite dcs_worksuite hardware_worksuite )
+    kernPkgs=( daq_kernel_modules )
+    else
+        cat <<EOF >/etc/yum.repos.d/xdaq.repo
+[xdaq-core]
+name     = XDAQ Core Software
+baseurl  = ${repoBase}/${repoDir}core/${xdaqVer}/${xdaqOS}/x86_64/RPMS/
+enabled  = 1
+gpgcheck = 0
+
+[xdaq-worksuite]
+name     = XDAQ Worksuite Software
+baseurl  = ${repoBase}/${repoDir}worksuite/${xdaqVer}/${xdaqOS}/x86_64/RPMS/
+enabled  = 1
+gpgcheck = 0
+
+[xdaq-xaas]
+name     = XDAQ XaaS Software
+baseurl  = ${repoBase}/${repoDir}xaas/${xdaqVer}/${xdaqOS}/x86_64/RPMS/
+enabled  = 1
+gpgcheck = 0
+
+[xdaq-iaas]
+name     = XDAQ IaaS Software
+baseurl  = ${repoBase}/${repoDir}iaas/${xdaqVer}/${xdaqOS}/x86_64/RPMS/
+enabled  = 0
+gpgcheck = 0
+EOF
+
+    basePkgs=( cmsos_core )
+    workPkgs=( cmsos_dcs_worksuite cmsos_worksuite )
+    kernPkgs=( cmsos-worksuite_kernel_modules )
+    fi
 
     echo Installing XDAQ...
 
+    # debug modules
+    installDebuginfo=0
+    prompt_confirm "Install xdaq debuginfo modules?"
+    if [ "$?" = "0" ]
+    then
+	installDebuginfo=1
+    fi
+
     # generic XDAQ
     yum -y remove openslp
-    yum -y groupinstall extern_coretools coretools extern_powerpack powerpack
+
+    cmd="yum -y groupinstall"
+    for b in ${basePkgs[@]}
+    do
+        cmd=${cmd}" ${b}"
+	if [ "${installDebuginfo}" == "1" ]
+	then
+            cmd=${cmd}" ${b}_debuginfo"
+	fi
+    done
+    eval ${cmd}
 
     # add-on packages
-    yum --skip-broken -y groupinstall database_worksuite general_worksuite dcs_worksuite hardware_worksuite
+    cmd="yum -y groupinstall"
+    for w in ${workPkgs[@]}
+    do
+        cmd=${cmd}" ${w}"
+	if [ "${installDebuginfo}" == "1" ]
+	then
+            cmd=${cmd}" ${w}_debuginfo"
+	fi
+    done
+    eval ${cmd}
 
     # for fedKit
     prompt_confirm "Install kernel modules for uFEDKIT?"
     if [ "$?" = "0" ]
     then
-        yum -y groupinstall daq_kernel_modules
+	cmd="yum -y groupinstall"
+	for k in ${kernPkgs[@]}
+	do
+            cmd=${cmd}" ${k}*"
+	done
+	eval ${cmd}
     fi
 
-    # debug modules
-    prompt_confirm "Install xdaq debuginfo modules?"
-    if [ "$?" = "0" ]
-    then
-        yum -y groupinstall exetern_coretools_debuginfo coretools_debuginfo extern_powerpack_debuginfo powerpack_debuginfo \
-            database_worksuite_debuginfo general_worksuite_debuginfo dcs_worksuite_debuginfo hardware_worksuite_debuginfo
-    fi
-
-    # Unpack the downloaded tarball
-    tar xzvf ${drvfile}
-    # Change the working directory.
-    cd mlnx-en-${mlnxver}-rhel${sncrel}-x86_64
-
-    # # Run the installation script, failing to get the init script...
-    # ./install
-
-    # RPM with YUM
-    rpm --import RPM-GPG-KEY-Mellanox
-    cat <<EOF > /etc/yum.repos.d/mellanox.repo
-[mlnx_en]
-name=MLNX_EN Repository
-baseurl=file://${PWD}/RPMS_ETH
-enabled=0
-gpgkey=file://${PWD}/RPM-GPG-KEY-Mellanox
-gpgcheck=1
-EOF
-    yum -y install mlnx-en-eth-only --disablerepo=* --enablerepo=mlnx_en
-
-    # Load the driver.
-    new_service mlnx-en.d on
     cd $curdir
     return 0
 }
@@ -260,41 +375,48 @@ EOF
 install_cactus() {
     # Option 'c'
     echo Installing cactus packages...
+    ## No longer support uhal 2.3 nor 2.4 for slc6
+    repoBase="http://www.cern.ch/ipbus/sw/release"
     uhalVersion="2.6"
     useUHAL25=0
+    uhalGCC=""
     prompt_confirm "Install uHAL?"
     if [ "$?" = "0" ]
     then
         while true
         do
-            read -r -n 1 -p "Select uhal version: 2.5 (1), 2.6 (2) " REPLY
+            read -r -n 1 -p "Select uhal version: 2.5 (1), 2.6 (2) , 2.6+gcc7 (3) " REPLY
             case $REPLY in
-                [1]) echo "Installing ipbus uhal version 2.5"
+                [1]) echo "Installing ipbus uhal version 2.5 (default gcc)"
                      uhalVersion="2.5"
                      useUHAL25=1
                      break
                      ;;
-                [2]) echo "Installing ipbus uhal version 2.6"
+                [2]) echo "Installing ipbus uhal version 2.6 (default gcc)"
                      uhalVersion="2.6/repos"
-                     useUHAL25=0
+                     break
+                     ;;
+                [3]) echo "Installing ipbus uhal version 2.6 compiled with gcc7"
+                     uhalVersion="2.6/repos"
+                     uhalGCC="_gcc7"
                      break
                      ;;
                 [sS]) echo "Skipping $REPLY..." ; break ;;
-                [qQ]) echo "Quitting..." ; return 0 ;;
+                [qQ]) echo "Quitting..." ; cd $curdir; return 0 ;;
                 *) printf "\033[31m %s \n\033[0m" "Invalid choice, please specify a uhal version, press s(S) to skip, or q(Q) to quit";;
             esac
         done
 
         cat <<EOF > /etc/yum.repos.d/ipbus-sw.repo
 [ipbus-sw-base]
-name=CACTUS Project Software Repository
-baseurl=http://www.cern.ch/ipbus/sw/release/${uhalVersion}/${ostype}${osver}_x86_64/base/RPMS
+name=IPBus Project Software Repository
+baseurl=${repoBase}/${uhalVersion}/${ostype}${osver}_x86_64${uhalGCC}/base/RPMS
 enabled=1
 gpgcheck=0
 
 [ipbus-sw-updates]
-name=CACTUS Project Software Repository Updates
-baseurl=http://www.cern.ch/ipbus/sw/release/${uhalVersion}/${ostype}${osver}_x86_64/updates/RPMS
+name=IPBus Project Software Repository Updates
+baseurl=${repoBase}/${uhalVersion}/${ostype}${osver}_x86_64${uhalGCC}/updates/RPMS
 enabled=1
 gpgcheck=0
 EOF
@@ -313,50 +435,47 @@ EOF
     prompt_confirm "Install amc13 libraries?"
     if [ "$?" = "0" ]
     then
-        if [ ${osver} = "6" ] && [ $useUHAL25 = "0" ]
-        then
-            echo "AMC13 libraries on ${ostype}${osver} are incompatible with uhal 2.6"
-            continue
-        elif [ ${osver} = "6" ]
-        then
-            amc13Version="1.2"
-        elif [ ${useUHAL25} = "0" ]
-        then
-            amc13Version="1.2/uhal2.6"
-        fi
+	## No longer support version 1.0 nor 1.1
+	## 1.2.8 is uhal 2.5, 1.2.13 is uhal 2.6? very unclear
+	repoBase="http://www.cern.ch/cactus/release/amc13"
+        amc13Version="1.2"
         cat <<EOF > /etc/yum.repos.d/amc13-sw.repo
-[cactus-amc13-base]
-name=CACTUS Project Software Repository for amc13 packages
-baseurl=http://www.cern.ch/cactus/release/amc13/${amc13Version}/${ostype}${osver}_x86_64/base/RPMS
+[amc13-base]
+name=AMC13 Software Repository Base
+baseurl=${repoBase}/${amc13Version}/${ostype}${osver}_x86_64/base/RPMS
 enabled=1
 gpgcheck=0
 
-[cactus-updates]
-name=CACTUS Project Software Repository Updates for amc13 packages
-baseurl=http://www.cern.ch/cactus/release/amc13/${amc13Version}/${ostype}${osver}_x86_64/updates/RPMS
+[amc13-updates]
+name=AMC13 Software Repository Updates
+baseurl=${repoBase}/${amc13Version}/${ostype}${osver}_x86_64/updates/RPMS
 enabled=1
 gpgcheck=0
 EOF
         yum -y groupinstall amc13
     fi
+
+    cd $curdir
+    return 0
 }
 
 install_misc_rpms() {
     # Option 'm'
     echo Installing miscellaneous RPMS...
-    yum -y install tree telnet htop arp-scan screen tmux cppcheck
+    yum -y install tree telnet htop arp-scan screen tmux cppcheck wget sudo acl
 
-    yum -y install libuuid-devel e2fsprogs-devel readline-devel ncurses-devel curl-devel boost-devel \
-        numactl-devel libusb-devel libusbx-devel protobuf-devel protobuf-lite-devel pugixml-devel
+    yum -y install libuuid-devel e2fsprogs-devel readline-devel ncurses-devel curl-devel \
+	boost-devel numactl-devel libusb-devel libusbx-devel libpng-devel \
+	protobuf-devel protobuf-lite-devel pugixml-devel nfs-utils nfs4-acl-tools
 
     if [ "${osver}" = "6" ]
     then
         yum -y install mysql-devel mysql-server
-        yum -y install sl-release-scl
+        yum -y install sl-release sl-release-scl sl-release-scl-rh
     elif [ "${osver}" = "7" ]
     then
         yum -y install mariadb-devel mariadb-server
-        yum -y install centos-release-scl
+        yum -y install centos-release centos-release-scl centos-release-scl-rh
     else
         echo "Unknown release ${osver}"
     fi
@@ -376,6 +495,9 @@ install_misc_rpms() {
         yum -y install emacs emacs-auctex emacs-common emacs-filesystem emacs-git \
             emacs-git-el emacs-gnuplot emacs-gnuplot-el emacs-rpm-spec-mode emacs-yaml-mode
     fi
+
+    cd $curdir
+    return 0
 }
 
 install_sysmgr() {
@@ -398,23 +520,51 @@ install_sysmgr() {
         new_service xinetd off
         new_service dnsmasq off
     fi
+
+    cd $curdir
+    return 0
 }
 
 install_root() {
     # Option 'r'
-    echo Installing root...
+    echo Installing ROOT...
     yum -y install root root-\* python\*-root
+
+    cd $curdir
+    return 0
 }
 
 install_python() {
     # Option 'p'
-    sclpyvers=( python27 python33 python34 )
+    pypkgs=( build coverage devel docutils \
+	importlib pip setuptools virtualenv \
+	MySQL numpy scipy simplejson \
+	python-devel \
+	six sphinx test wheel )
+
+    for pypkg in "${pypkgs[@]}"
+    do
+        cmd="${cmd} python-${pypkg}"
+    done;
+
+    prompt_confirm "Install pypy?"
+    if [ "$?" = "0" ]
+    then
+	cmd="yum -y install \*pypy\*"
+    fi
+
+    sclpyvers=( python27 python33 python34 python36 )
     for sclpy in "${sclpyvers[@]}"
     do
         prompt_confirm "Install ${sclpy}?"
         if [ "$?" = "0" ]
         then
-            eval yum -y install ${sclpy}*
+	    cmd="yum -y install"
+            for pypkg in "${pypkgs[@]}"
+            do
+		cmd="${cmd} ${sclpy}-${pypkg}"
+            done;
+            eval $cmd
         fi
     done
 
@@ -424,15 +574,22 @@ install_python() {
         prompt_confirm "Install ${rhpy}?"
         if [ "$?" = "0" ]
         then
-            eval yum -y install ${rhpy}*
+	    cmd="yum -y install"
+            for pypkg in "${pypkgs[@]}"
+            do
+		cmd="${cmd} ${rhpy}-${pypkg}"
+            done;
+            eval $cmd
         fi
     done
 
+    cd $curdir
     return 0
 
     if [ ! -z "${1}" ]
     then
         echo No python version specified
+	cd $curdir
         return 1
     fi
 
@@ -475,16 +632,19 @@ install_python() {
     ln -s /usr/lib64/python2.6/site-packages/ROOT.py /usr/local/lib/python2.7/site-packages/ROOT.py
     ln -s /usr/lib64/python2.6/site-packages/ROOTwriter.py /usr/local/lib/python2.7/site-packages/ROOTwriter.py
     ln -s /usr/lib64/python2.6/site-packages/libPyROOT.so /usr/local/lib/python2.7/site-packages/libPyROOT.so
+
+    cd $curdir
+    return 0
 }
 
 install_developer_tools() {
     # Option 'd'
     echo Installing developer tools RPMS...
 
-    prompt_confirm "Install rh-git29?"
+    prompt_confirm "Install rh-git218?"
     if [ "$?" = "0" ]
     then
-       yum -y install rh-git29*
+       yum -y install rh-git218*
     fi
 
     prompt_confirm "Install git-lfs?"
@@ -500,20 +660,27 @@ install_developer_tools() {
         prompt_confirm "Install ${rver}?"
         if [ "$?" = "0" ]
         then
-            yum -y install ${rver}*
+            yum -y install ${rver} ${rver}-rubygems ${rver}-\* \*rubygem-simlecov \
+		--exclude=rh-ruby\*-build --exclude=rh-ruby\*-scldevel
         fi
     done
 
-    devtools=( devtoolset-3 devtoolset-4 devtoolset-6 devtoolset-7 )
+    yum -y install clang clang-analyzer clang-devel \
+	llvm3.9 llvm3.9-devel \
+	llvm5.0 llvm5.0-devel \
+	llvm7.0 llvm7.0-devel \
+	llvm\*-static
+
+    devtools=( devtoolset-3 devtoolset-4 devtoolset-6 devtoolset-7 devtoolset-8 )
     for dtool in "${devtools[@]}"
     do
-        tools=( make gcc oprofile valgrind )
+        tools=( perftools toolchain libgccjit libgccjit-devel libstdc++-devel llvm llvm-devel )
         for tool in "${tools[@]}"
         do
             prompt_confirm "Install ${dtool}-${tool}?"
             if [ "$?" = "0" ]
             then
-                eval yum -y install ${dtool}-${tool}*
+                eval yum -y install ${dtool}-${tool}
             fi
         done
     done
@@ -528,7 +695,8 @@ setup_nas() {
     if [ ! "$?" = "0" ]
     then
         echo Unable to ping ${nashost}, are you sure the hostname is correct or the NAS is on?
-        return 1
+	cd $curdir
+	return 1
     fi
 
     echo Connecting to the NAS at ${nashost}
@@ -553,7 +721,42 @@ EOF
 EOF
     fi
 
+    cat <<EOF>/etc/yum.repos.d/gemos.repo
+[gemos-base]
+name     = CMS GEM Online Software Repository Base
+baseurl  = file:///data/bigdisk/sw/gemonlinesw/repos/${ostype}${osver}_x86_64/base/RPMS
+enabled  = 0
+gpgcheck = 0
+
+[gemos-updates]
+name     = CMS GEM Online Software Repository Updates
+baseurl  = file:///data/bigdisk/sw/gemonlinesw/repos/${ostype}${osver}_x86_64/updates/RPMS
+enabled  = 0
+gpgcheck = 0
+
+[gemos-devel]
+name     = CMS GEM Online Software Repository Devel
+baseurl  = file:///data/bigdisk/sw/gemonlinesw/repos/${ostype}${osver}_x86_64/devel/RPMS
+enabled  = 0
+gpgcheck = 0
+
+[gemos-test]
+name     = CMS GEM Online Software Repository Test
+baseurl  = file:///data/bigdisk/sw/gemonlinesw/repos/${ostype}${osver}_x86_64/test/RPMS
+enabled  = 0
+gpgcheck = 0
+
+[gemos-extras]
+name     = CMS GEM Online Software Repository Extras
+baseurl  = http://www.cern.ch/cmsgemdaq/sw/repos/${ostype}${osver}_x86_64/extras/RPMS
+enabled  = 1
+gpgcheck = 0
+EOF
+
     new_service autofs on
+
+    cd $curdir
+    return 0
 }
 
 #### Drivers for special hardware ###
@@ -563,6 +766,7 @@ install_mellanox_driver() {
     if [ ! "$?" = "0" ]
     then
         echo -e "\033[1;31mNo Mellanox device detected, are you sure you have the interface installed?\033[0m"
+	cd $curdir
         return 1
     fi
     crel=$(cat /etc/system-release)
@@ -609,6 +813,7 @@ EOF
 
     # Load the driver.
     new_service mlnx-en.d on
+
     cd $curdir
     return 0
 }
@@ -623,6 +828,7 @@ update_xpci_driver() {
     if [ ! "$?" = "0" ]
     then
         echo -e "\033[1;31mFailed to download daq-xpcidrv sources\033[0m"
+	cd $curdir
         return 1
     fi
 
@@ -647,7 +853,9 @@ update_xpci_driver() {
     then
         modprobe xpci
     fi
-    cd ${curdir}
+
+    cd $curdir
+    return 0
 }
 
 #### Networking for certain devices ####
@@ -681,12 +889,15 @@ EOF
                          break
                          ;;
                     [sS]) echo -e "\033[1;33mSkipping $REPLY...\033[0m" ; break ;;
-                    [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; return 0 ;;
+                    [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; cd $curdir; return 0 ;;
                     *) printf "\033[1;31m %s \n\033[0m" "Invalid choice, please specify an interface type, press s(S) to skip, or q(Q) to quit";;
                 esac
             done
         fi
     done
+
+    cd $curdir
+    return 0
 }
 
 #### Compatibility with CTP7 (NEEDS TO BE WRITTEN)
@@ -748,7 +959,7 @@ EOF
                          break
                          ;;
                     [sS]) echo -e "\033[1;33mSkipping $REPLY...\033[0m" ; break ;;
-                    [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; return 0 ;;
+                    [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; cd $curdir; return 0 ;;
                     *) printf "\033[1;31m %s \n\033[0m" "Invalid choice, please specify an MCH type, press s(S) to skip, or q(Q) to quit";;
                 esac
             done
@@ -1085,7 +1296,6 @@ EOF
 
     ## Update /etc/hosts with CTP7-related dns (bird) names
     cat <<EOF >> /etc/hosts
-
 # falcons
 EOF
     for bird in {1..2}
@@ -1096,7 +1306,6 @@ EOF
     done
 
     cat <<EOF >> /etc/hosts
-
 # ravens
 EOF
     for bird in {1..6}
@@ -1107,7 +1316,6 @@ EOF
     done
 
     cat <<EOF >> /etc/hosts
-
 # eagles
 EOF
     for bird in {1..65}
@@ -1116,6 +1324,32 @@ EOF
 192.168.250.$((9+bird)) eagle$bird eagle$bird.utca
 EOF
     done
+
+    cat <<EOF >> /etc/hosts
+# geographic
+EOF
+    for shelf in {1..4}
+    do
+	snum=$(printf %02d $shelf)
+        cat <<EOF >> /etc/hosts
+192.168.$shelf.10 gem.shelf$snum.mch gem-shelf$snum-mch mch-c$snum mch-c$snum.utca
+EOF
+	for amc in {1..12}
+	do
+	    anum=$(printf %02d $amc)
+            cat <<EOF >> /etc/hosts
+192.168.$shelf.${amc} gem.shelf$snum.amc$anum gem-shelf$snum-amc$anum amc-c$snum-s$anum amc-c$snum-s$anum.utca
+EOF
+	done
+        cat <<EOF >> /etc/hosts
+## FIXME these must be determined from the actual AMC13s, unless they are configured to have their IP addresses set
+# 192.168.$shelf.13 gem.shelf$snum.amc13.t1 gem-shelf$snum-amc13-t1 amc-c$snum-s13-t1 amc-c$snum-s13-t1.utca
+# 192.168.$shelf.14 gem.shelf$snum.amc13.t2 gem-shelf$snum-amc13-t2 amc-c$snum-s13-t2 amc-c$snum-s13-t2.utca
+EOF
+    done
+
+    cd $curdir
+    return 0
 }
 
 #### Accounts and NICE users
@@ -1125,7 +1359,7 @@ create_accounts() {
     # or even 'service' accounts, but better to have them tied to egroups
     # so one can log in with NICE credentials, a la cchcal
 
-    ### generic gemuser group for running tests
+    ### generic gemuser group for running tests, put this directory on the NAS?
     new_system_user gemuser 5075 5075
     chmod a+rx /home/gemuser
 
@@ -1155,6 +1389,9 @@ create_accounts() {
 
     ### gemsudoers group for administering the system
     new_system_group gemsudoers 1075
+
+    cd $curdir
+    return 0
 }
 
 add_cern_users() {
@@ -1195,14 +1432,18 @@ add_cern_users() {
                 fi
                 echo -e "\033[1;35mDone setting up $user\033[0m"
             done 4< "$REPLY"
+	    cd $curdir
             return 0
         else
             case $REPLY in
-                [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; return 0 ;;
+                [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; cd $curdir; return 0 ;;
                 *) printf "\033[1;31m %s \n\033[0m" "File does not exist, please specify a file, or press q(Q) to quit";;
             esac
         fi
     done
+
+    cd $curdir
+    return 0
 }
 
 usage() {
