@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 arch=`uname -i`
 # setup_version=2.7.2-1.cmsos12
@@ -13,8 +13,9 @@ fi
 prompt_confirm() {
     while true
     do
-        read -u 3 -r -n 1 -p $'\e[1;35m'"${1:-Continue?}"$' [y/N/q]:\033[0m ' REPLY
+        read -u 3 -r -n 1 -p $'\e[1;35m'"${1:-Continue?}"$' [y/N/a/q]:\033[0m ' REPLY
         case $REPLY in
+            [aA]) echo ; return 5 ;;
             [yY]) echo ; return 0 ;;
             [nN]) echo ; return 1 ;;
             [qQ]) echo ; cd $curdir; exit 1 ;;
@@ -40,9 +41,9 @@ new_service() {
         chkconfig --level 345 $1 ${status}
         if [ "${status}" = "on" ]
         then
-           service ${newserv} restart
+            service ${newserv} restart
         else
-           service ${newserv} stop
+            service ${newserv} stop
         fi
     elif [ "${osver}" = "7" ]
     then
@@ -107,7 +108,7 @@ new_system_user() {
     chown $1:$3 -R /home/$1
 
     prompt_confirm "Create directory for $1 on connected NAS?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
         mkdir -p --context=system_u:object_r:nfs_t:s0 /data/bigdisk/users/$1
         chown -R $1:zh /data/bigdisk/users/$1
@@ -123,11 +124,11 @@ configure_interface() {
     if [ -z "$2" ] || [[ ! "$2" =~ ^("uTCA"|"uFEDKIT") ]]
     then
         echo -e \
-             "Usage: configure_interface <device> <type>\n" \
-             "   device must be listed in /sys/class/net\n" \
-             "   type myst be one of:\n" \
-             "     uTCA for uTCA on local network\n" \
-             "     uFEDKIT for uFEDKIT on 10GbE\n"
+            "Usage: configure_interface <device> <type>\n" \
+            "   device must be listed in /sys/class/net\n" \
+            "   type myst be one of:\n" \
+            "     uTCA for uTCA on local network\n" \
+            "     uFEDKIT for uFEDKIT on 10GbE\n"
 	cd $curdir
         return 1
     fi
@@ -215,7 +216,8 @@ configure_interface() {
 ### copied from HCAL setup scripts
 install_xdaq() {
     # Option 'x'
-    # doesn't include SRPMS
+    echo -e "\n\033[1;32mInstalling xDAQ software...\033[0m"
+
     repoBase="http://xdaq.web.cern.ch/xdaq/repo"
     if [ "${osver}" = "6" ]
     then
@@ -225,10 +227,11 @@ install_xdaq() {
     elif [ "${osver}" = "7" ]
     then
 	# choose from xdaq14, xdaq14.6, xdaq15 for CC7
-	xdaqOS=${ostype}
+	xdaqOS="cc7"
         while true
         do
-            read -r -n 1 -p "Select xDAQ version: 14 (1), 14.6 (2), 15 (3)\n" REPLY
+            read -r -n 1 -p "Select xDAQ version: 14 (1), 14.6 (2), 15 (3): " REPLY
+	    echo
             case $REPLY in
                 [1]) echo "Installing xdaq 14 yum repo"
 		    xdaqVer="14"
@@ -285,9 +288,9 @@ enabled  = 1
 gpgcheck = 0
 EOF
 
-    basePkgs=( extern_coretools coretools extern_powerpack powerpack )
-    workPkgs=( database_worksuite general_worksuite dcs_worksuite hardware_worksuite )
-    kernPkgs=( daq_kernel_modules )
+	basePkgs=( extern_coretools coretools extern_powerpack powerpack )
+	workPkgs=( database_worksuite general_worksuite dcs_worksuite hardware_worksuite )
+	kernPkgs=( daq_kernel_modules )
     else
         cat <<EOF >/etc/yum.repos.d/xdaq.repo
 [xdaq-core]
@@ -315,9 +318,9 @@ enabled  = 0
 gpgcheck = 0
 EOF
 
-    basePkgs=( cmsos_core )
-    workPkgs=( cmsos_dcs_worksuite cmsos_worksuite )
-    kernPkgs=( cmsos-worksuite_kernel_modules )
+	basePkgs=( cmsos_core )
+	workPkgs=( cmsos_dcs_worksuite cmsos_worksuite )
+	kernPkgs=( cmsos-worksuite_kernel_modules )
     fi
 
     echo Installing XDAQ...
@@ -325,7 +328,7 @@ EOF
     # debug modules
     installDebuginfo=0
     prompt_confirm "Install xdaq debuginfo modules?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
 	installDebuginfo=1
     fi
@@ -353,18 +356,21 @@ EOF
 	then
             cmd=${cmd}" ${w}_debuginfo"
 	fi
+	cmd=${cmd}" --exclude=\*psx\*"
+	cmd=${cmd}" --exclude=\*caen\*{USB,a,comm,up}\*"
     done
     eval ${cmd}
 
     # for fedKit
     prompt_confirm "Install kernel modules for uFEDKIT?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
 	cmd="yum -y groupinstall"
 	for k in ${kernPkgs[@]}
 	do
             cmd=${cmd}" ${k}*"
 	done
+	cmd=${cmd}" --exclude=\*psx\* --exclude=\*caen\*"
 	eval ${cmd}
     fi
 
@@ -374,33 +380,35 @@ EOF
 
 install_cactus() {
     # Option 'c'
-    echo Installing cactus packages...
+    echo -e "\n\033[1;32mInstalling uhal and amc13 software...\033[0m"
+
     ## No longer support uhal 2.3 nor 2.4 for slc6
     repoBase="http://www.cern.ch/ipbus/sw/release"
     uhalVersion="2.6"
     useUHAL25=0
     uhalGCC=""
     prompt_confirm "Install uHAL?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
         while true
         do
             read -r -n 1 -p "Select uhal version: 2.5 (1), 2.6 (2) , 2.6+gcc7 (3) " REPLY
+	    echo
             case $REPLY in
                 [1]) echo "Installing ipbus uhal version 2.5 (default gcc)"
-                     uhalVersion="2.5"
-                     useUHAL25=1
-                     break
-                     ;;
+                    uhalVersion="2.5"
+                    useUHAL25=1
+                    break
+                    ;;
                 [2]) echo "Installing ipbus uhal version 2.6 (default gcc)"
-                     uhalVersion="2.6/repos"
-                     break
-                     ;;
+                    uhalVersion="2.6/repos"
+                    break
+                    ;;
                 [3]) echo "Installing ipbus uhal version 2.6 compiled with gcc7"
-                     uhalVersion="2.6/repos"
-                     uhalGCC="_gcc7"
-                     break
-                     ;;
+                    uhalVersion="2.6/repos"
+                    uhalGCC="_gcc7"
+                    break
+                    ;;
                 [sS]) echo "Skipping $REPLY..." ; break ;;
                 [qQ]) echo "Quitting..." ; cd $curdir; return 0 ;;
                 *) printf "\033[31m %s \n\033[0m" "Invalid choice, please specify a uhal version, press s(S) to skip, or q(Q) to quit";;
@@ -424,7 +432,7 @@ EOF
         yum -y groupinstall uhal
 
         prompt_confirm "Setup machine as controlhub?"
-        if [ "$?" = "0" ]
+        if [ "$?" = "0" ] || [ "$?" = "5" ]
         then
             new_service controlhub on
         else
@@ -433,7 +441,7 @@ EOF
     fi
 
     prompt_confirm "Install amc13 libraries?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
 	## No longer support version 1.0 nor 1.1
 	## 1.2.8 is uhal 2.5, 1.2.13 is uhal 2.6? very unclear
@@ -461,8 +469,9 @@ EOF
 
 install_misc_rpms() {
     # Option 'm'
-    echo Installing miscellaneous RPMS...
-    yum -y install tree telnet htop arp-scan screen tmux cppcheck wget sudo acl
+    echo -e "\n\033[1;32mInstalling miscellaneous RPMS...\033[0m"
+
+    yum -y install autoconf automake tree telnet htop arp-scan screen tmux cppcheck wget sudo acl
 
     yum -y install libuuid-devel e2fsprogs-devel readline-devel ncurses-devel curl-devel \
 	boost-devel numactl-devel libusb-devel libusbx-devel libpng-devel \
@@ -481,7 +490,7 @@ install_misc_rpms() {
     fi
 
     prompt_confirm "Install updated emacs?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
         if [ "${osver}" = "6" ]
         then
@@ -492,8 +501,27 @@ install_misc_rpms() {
         fi
         rpm --import http://pj.freefaculty.org/EL/PaulJohnson-BinaryPackageSigningKey
         yum -y install emacs --disablerepo=* --enablerepo=pjku
-        yum -y install emacs emacs-auctex emacs-common emacs-filesystem emacs-git \
-            emacs-git-el emacs-gnuplot emacs-gnuplot-el emacs-rpm-spec-mode emacs-yaml-mode
+        yum -y install emacs emacs-auctex emacs-common emacs-filesystem \
+            emacs-gnuplot emacs-gnuplot-el emacs-rpm-spec-mode emacs-yaml-mode
+
+	## from source
+	emacsvers=( 25.3 26.2 )
+	mkdir -p /tmp/build-emacs
+	startdir=$PWD
+	for emver in "${emacsvers[@]}"
+	do
+	    wget https://mirrors.ocf.berkeley.edu/gnu/emacs/emacs-${emver}.tar.gz -O /tmp/build-emacs/emacs-${emver}.tar.gz
+	    cd /tmp/build-emacs/
+	    tar xzf emacs-${emver}.tar.gz
+	    cd emacs-${emver}
+	    ./configure --program-suffix=${emver%%.*} --prefix=/usr/local --without-x --with-gnutls=no
+	    # ./configure --prefix=/usr/local --without-x --with-gnutls=no
+	    make -j8
+	    make uninstall
+	    make install
+	    # ln -s /usr/local/bin/emacs-${emver} /usr/local/bin/emacs${emver%%.*}
+	    cd $startdir
+	done
     fi
 
     cd $curdir
@@ -502,16 +530,171 @@ install_misc_rpms() {
 
 install_sysmgr() {
     # Option 'S'
-    echo Installing UW sysmgr RPMS...
-    wget https://www.hep.wisc.edu/uwcms-repos/el${osver}/release/uwcms.repo -O /etc/yum.repos.d/uwcms.repo
-    yum -y install freeipmi-devel libxml++-devel libconfuse-devel xinetd dnsmasq
-    yum -y install sysmgr-complete
+    echo -e "\n\033[1;32mInstalling UW sysmgr RPMS...\033[0m"
+
+    wget https://www.hep.wisc.edu/uwcms-repos/el${osver}/release/uwcms.repo \
+	--no-check-certificate \
+	-O /etc/yum.repos.d/uwcms.repo \
+	|| return $(echo -e "\033[1;31mFailed to download uwcms repo\033[0m" >&2 && return 1)
+    echo "sslverify=0" >> /etc/yum.repos.d/uwcms.repo
+    yum -y install freeipmi-devel libxml++-devel libconfuse-devel xinetd dnsmasq \
+	|| return $(echo -e "\033[1;31mFailed to install sysngr dependencies \033[0m" >&2 && return 1)
+    yum -y install sysmgr-complete \
+	|| return $(echo -e "\033[1;31mFailed to install sysmgr-complete\033[0m" >&2 && return 1)
     # yum -y install sysmgr
 
     prompt_confirm "Setup machine to communicate directly to a CTP7?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
-        connect_ctp7s
+	# Updated /etc/sysmgr/sysmgr.conf to enable the GenericUW configuration module to support "WISC CTP-7" cards.
+	if [ -e /etc/sysmgr/sysmgr.conf ]
+	then
+            mv /etc/sysmgr/sysmgr.conf /etc/sysmgr/sysmgr.conf.bak
+	fi
+
+	authkey="Aij8kpjf"
+
+	cat <<EOF > /etc/sysmgr/sysmgr.conf
+socket_port = 4681
+
+# If ratelimit_delay is set, it defines the number of microseconds that the
+# system manager will sleep after sending a command to a crate on behalf of a
+# client application.  This can be used to avoid session timeouts due to
+# excessive rates of requests.
+#
+# Note that this will suspend only the individual crate thread, and other
+# crates will remain unaffected, as will any operation that does not access an
+# individual crate.  The default, 0, is no delay.
+ratelimit_delay = 100000
+
+# If true, the system manager will run as a daemon, and send stdout to syslog.
+daemonize = true
+
+authentication {
+	raw = { "${authkey}" }
+	manage = { }
+	read = { "" }
+}
+
+EOF
+
+	# add crates
+	# take input from prompt for ipaddress, type, password, and description
+	nShelves=0
+	while true
+	do
+            prompt_confirm "Add uTCA shelf to sysmgr config?"
+            if [ "$?" = "0" ] || [ "$?" = "5" ]
+            then
+		while true
+		do
+                    read -r -n 1 -p $'\e[1;34m Add uTCA shelf with MCH of type: VadaTech (1) or NAT (2)\033[0m ' REPLY
+		    echo
+                    case $REPLY in
+			[1]) echo -e "\n\033[1;36mAdding uTCA shelf with VadaTech MCH...\033[0m"
+                            type="VadaTech"
+                            password="vadatech"
+                            break
+                            ;;
+			[2]) echo -e "\n\033[1;36mAdding uTCA shelf with NAT MCH...\033[0m"
+                            type="NAT"
+                            password=""
+                            break
+                            ;;
+			[sS]) echo -e "\033[1;33mSkipping $REPLY...\033[0m" ; break ;;
+			[qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; cd $curdir; return 0 ;;
+			*) printf "\033[1;31m %s \n\033[0m" "Invalid choice, please specify an MCH type, press s(S) to skip, or q(Q) to quit";;
+                    esac
+		done
+
+		while true
+		do
+                    read -r -p $'\e[1;34mPlease specify the IP address of the MCH:\033[0m ' REPLY
+		    echo
+                    rx='([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
+                    oct='(0[0-7]{0,2})|([1-9][0-9])|(1[0-9][0-9])|(2[0-4][0-9])|(25[0-5])'
+                    rex="^$oct.$ot.$oct.$oct$"
+                    re1="^([0-9]{1,3}\.){3}(\.?[0-9]{1,3})$"
+                    re2="^([0-9]{1,3}.){3}(.?[0-9]{1,3})$"
+                    re3='^([0-9]{1,3}.){3}(.?[0-9]{1,3})$'
+                    # if ! [[ "$REPLY" =~ $re1 ]]
+                    # if ! [[ "$REPLY" =~ $re2 ]]
+                    if ! [[ "$REPLY" =~ $re3 ]]
+                    then
+			printf "\033[1;31m %s \n\033[0m" "Invalid IP address ${REPLY} specified"
+			continue
+                    fi
+                    ipaddr=$REPLY
+                    break
+		done
+
+		read -r -p $'\e[1;34mPlease enter a description for this uTCA shelf:\033[0m ' REPLY
+		echo
+		desc=$REPLY
+		cat <<EOF >> /etc/sysmgr/sysmgr.conf
+crate {
+	host = "${ipaddr}"
+	mch = "${type}"
+	username = ""
+	password = "${password}"
+	authtype = none
+	description = "${desc}"
+}
+EOF
+		nShelves=$((nShelves+1))
+            elif [ "$?" = "1" ]
+            then
+		echo -e "\n\033[1;36mDone adding ${nShelves} shelves, now moving on to configs\033[0m"
+		break
+            fi
+	done
+
+	cat <<EOF >> /etc/sysmgr/sysmgr.conf
+# *** Modules ***
+#
+# These modules will be loaded in the order specified here.  When a new card is
+# detected, they will be checked in reverse order to determine which module
+# will service that card.  If no module claims a card, it will be serviced by
+# the system manager with no special functionality.
+
+cardmodule {
+	module = "GenericUW.so"
+	config = {
+		"ivtable=ipconfig.xml",
+ 		"poll_count=12",
+ 		"poll_delay=15"
+	}
+}
+
+cardmodule {
+        module = "GenericUW.so"
+        config = {
+                "ivtable=ipconfig.xml",
+                # "poll_count=27448000",
+                "poll_count=52596000",
+                "poll_delay=30",
+                "support=WISC CTP-6",
+                "support=WISC CIOX",
+                "support=WISC CIOZ",
+                "support=BU AMC13"
+        }
+}
+
+cardmodule {
+	module = "UWDirect.so"
+	config = {
+		"ivtable=ipconfig.xml",
+                # "poll_count=27448000",
+		"poll_count=105192000",
+		"poll_delay=15",
+		"support=WISC CTP-7#19",
+		"support=WISC CIOZ#14"
+	}
+}
+
+EOF
+
+        connect_ctp7s ${nShelves}
         new_service sysmgr on
         new_service xinetd on
         new_service dnsmasq on
@@ -527,7 +710,8 @@ install_sysmgr() {
 
 install_root() {
     # Option 'r'
-    echo Installing ROOT...
+    echo -e "\n\033[1;32mInstalling ROOT...\033[0m"
+
     yum -y install root root-\* python\*-root
 
     cd $curdir
@@ -536,30 +720,55 @@ install_root() {
 
 install_python() {
     # Option 'p'
+    echo -e "\n\033[1;32mInstalling Python versions...\033[0m"
+
     pypkgs=( build coverage devel docutils \
 	importlib pip setuptools virtualenv \
 	MySQL numpy scipy simplejson \
-	python-devel \
-	six sphinx test wheel )
+	sqlalchemy six sphinx test wheel )
 
+    cmd="yum -y install"
     for pypkg in "${pypkgs[@]}"
     do
-        cmd="${cmd} python-${pypkg}"
-    done;
+        cmd="${cmd} python-${pypkg} python2-${pypkg} python3-${pypkg}"
+    done
+    eval $cmd scipy
 
     prompt_confirm "Install pypy?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
-	cmd="yum -y install \*pypy\*"
+	yum -y install \*pypy\*
     fi
 
+    pypkgs=( build numpy scipy devel importlib python \
+	python-coverage python-docutils \
+	python-pip python-setuptools python-virtualenv \
+	python-MySQL python-simplejson \
+	python-devel python-sqlalchemy \
+	python-six python-sphinx python-test python-wheel )
+
     sclpyvers=( python27 python33 python34 python36 )
+    yesToAll=
+    echo -e "\n\033[1;32mYou will be presented with individual options to install: ${sclpyvers[@]}, by selecting 'a/A', you will install all\033[0m"
     for sclpy in "${sclpyvers[@]}"
     do
-        prompt_confirm "Install ${sclpy}?"
+	if [ -z "${yesToAll}" ]
+	then
+            prompt_confirm "Install ${sclpy}?"
+	    if [ "$?" = "5" ]
+	    then
+		yesToAll="1"
+	    elif [ "$?" = "1" ]
+	    then
+		ls /fail >& /dev/null
+	    elif [ "$?" = "0" ]
+	    then
+		ls / >& /dev/null
+	    fi
+	fi
         if [ "$?" = "0" ]
         then
-	    cmd="yum -y install"
+	    cmd="yum -y install ${sclpy}"
             for pypkg in "${pypkgs[@]}"
             do
 		cmd="${cmd} ${sclpy}-${pypkg}"
@@ -569,12 +778,27 @@ install_python() {
     done
 
     rhpyvers=( rh-python34 rh-python35 rh-python36 )
+    yesToAll=
+    echo -e "\n\033[1;32mYou will be presented with individual options to install: ${rhpyvers[@]}, by selecting 'a/A', you will install all\033[0m"
     for rhpy in "${rhpyvers[@]}"
     do
-        prompt_confirm "Install ${rhpy}?"
+	if [ -z "${yesToAll}" ]
+	then
+            prompt_confirm "Install ${rhpy}?"
+	    if [ "$?" = "5" ]
+	    then
+		yesToAll="1"
+	    elif [ "$?" = "1" ]
+	    then
+		ls /fail >& /dev/null
+	    elif [ "$?" = "0" ]
+	    then
+		ls / >& /dev/null
+	    fi
+	fi
         if [ "$?" = "0" ]
         then
-	    cmd="yum -y install"
+	    cmd="yum -y install ${rhpy}"
             for pypkg in "${pypkgs[@]}"
             do
 		cmd="${cmd} ${rhpy}-${pypkg}"
@@ -585,83 +809,52 @@ install_python() {
 
     cd $curdir
     return 0
-
-    if [ ! -z "${1}" ]
-    then
-        echo No python version specified
-	cd $curdir
-        return 1
-    fi
-
-    pyver=${1}
-    echo "Installing python2.7 (${pyver}) from source, no longer best option probably!"
-
-    # install dependencies
-    yum -y install tcl-devel tk-devel
-
-    # common source directory, may already exist
-    mkdir -p /data/bigdisk/sw/python2.7/
-    cd /data/bigdisk/sw/python2.7/
-
-    # setup scripts
-    wget https://bootstrap.pypa.io/ez_setup.py
-    wget https://www.python.org/ftp/python/${pyver}/Python-${pyver}.tar.xz
-    tar xf Python-${pyver}.tar.xz
-    cd Python-${pyver}
-    ./configure --prefix=/usr/local --enable-unicode=ucs4 --enable-shared LDFLAGS="-Wl,-rpath /usr/local/lib"
-
-    # clean up in case previously compiled and then compile
-    make clean && make -j5
-
-    # do the installation
-    make altinstall
-
-    cd /data/bigdisk/sw/python2.7/
-    /usr/local/bin/python2.7 ez_setup.py
-    /usr/local/bin/easy_install-2.7 pip
-
-    # add links to the python26 packages we'll need, how to do this generally
-    ln -s /usr/lib/python2.6/site-packages/uhal /usr/local/lib/python2.7/site-packages/uhal
-
-    ln -s /usr/lib/python2.6/site-packages/cactusboards_amc13_python-1.1.10-py2.6.egg-info /usr/local/lib/python2.7/site-packages/cactusboards_amc13_python-1.1.10-py2.6.egg-info
-    ln -s /usr/lib/python2.6/site-packages/cactuscore_tsxdaqclient-2.6.3-py2.6.egg-info /usr/local/lib/python2.7/site-packages/cactuscore_tsxdaqclient-2.6.3-py2.6.egg-info
-    ln -s /usr/lib/python2.6/site-packages/cactuscore_uhal_gui-2.3.0-py2.6.egg-info /usr/local/lib/python2.7/site-packages/cactuscore_uhal_gui-2.3.0-py2.6.egg-info
-    ln -s /usr/lib/python2.6/site-packages/cactuscore_uhal_pycohal-2.4.0-py2.6.egg-info /usr/local/lib/python2.7/site-packages/cactuscore_uhal_pycohal-2.4.0-py2.6.egg-info
-
-    ln -s /usr/lib/python2.6/site-packages/amc13 /usr/local/lib/python2.7/site-packages/amc13
-    ln -s /usr/lib64/python2.6/site-packages/ROOT.py /usr/local/lib/python2.7/site-packages/ROOT.py
-    ln -s /usr/lib64/python2.6/site-packages/ROOTwriter.py /usr/local/lib/python2.7/site-packages/ROOTwriter.py
-    ln -s /usr/lib64/python2.6/site-packages/libPyROOT.so /usr/local/lib/python2.7/site-packages/libPyROOT.so
-
-    cd $curdir
-    return 0
 }
 
 install_developer_tools() {
     # Option 'd'
-    echo Installing developer tools RPMS...
+    echo -e "\n\033[1;32mInstalling developer tools RPMS...\033[0m"
 
     prompt_confirm "Install rh-git218?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
-       yum -y install rh-git218*
+	yum -y install rh-git218* \
+	    --exclude=\*rh-\*-scldevel\* --exclude=\*rh-\*-build\* \
+	    || return $(echo -e "\033[1;31mFailed to install rh-git218\033[0m" >&2 && return 1)
     fi
 
     prompt_confirm "Install git-lfs?"
-    if [ "$?" = "0" ]
+    if [ "$?" = "0" ] || [ "$?" = "5" ]
     then
-        curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh|bash
-        yum -y install git-lfs
+        curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | bash \
+	    && yum -y install git-lfs \
+	    || return $(echo -e "\033[1;31mFailed to install git-lfs\033[0m" >&2 && return 1)
     fi
 
     rubyvers=( rh-ruby22 rh-ruby23 rh-ruby24 )
+    yesToAll=
+    echo -e "\n\033[1;32mYou will be presented with individual options to install: ${rubyvers[@]}, by selecting 'a/A', you will install all\033[0m"
     for rver in "${rubyvers[@]}"
     do
-        prompt_confirm "Install ${rver}?"
+	if [ -z "${yesToAll}" ]
+	then
+            prompt_confirm "Install ${rver}?"
+	    if [ "$?" = "5" ]
+	    then
+		yesToAll="1"
+	    elif [ "$?" = "1" ]
+	    then
+		ls /fail >& /dev/null
+	    elif [ "$?" = "0" ]
+	    then
+		ls / >& /dev/null
+	    fi
+	fi
         if [ "$?" = "0" ]
         then
             yum -y install ${rver} ${rver}-rubygems ${rver}-\* \*rubygem-simlecov \
-		--exclude=rh-ruby\*-build --exclude=rh-ruby\*-scldevel
+		--exclude=rh-ruby\*-build --exclude=rh-ruby\*-scldevel \
+		|| return $(echo -e "\033[1;31mFailed to install ${rver}\033[0m" >&2 && return 1)
         fi
     done
 
@@ -669,26 +862,50 @@ install_developer_tools() {
 	llvm3.9 llvm3.9-devel \
 	llvm5.0 llvm5.0-devel \
 	llvm7.0 llvm7.0-devel \
-	llvm\*-static
+	llvm\*-static \
+	|| return $(echo -e "\033[1;31mFailed to install llvm tools\033[0m" >&2 && return 1)
 
     devtools=( devtoolset-3 devtoolset-4 devtoolset-6 devtoolset-7 devtoolset-8 )
+    tools=( perftools toolchain libgccjit libgccjit-devel libstdc++-devel llvm llvm-devel )
+    yesToAll=
+    echo -e "\n\033[1;32mYou will be presented with individual options to install: ${devtools[@]}, by selecting 'a/A', you will install all\033[0m"
     for dtool in "${devtools[@]}"
     do
-        tools=( perftools toolchain libgccjit libgccjit-devel libstdc++-devel llvm llvm-devel )
-        for tool in "${tools[@]}"
-        do
-            prompt_confirm "Install ${dtool}-${tool}?"
-            if [ "$?" = "0" ]
-            then
-                eval yum -y install ${dtool}-${tool}
-            fi
-        done
+	if [ -z "${yesToAll}" ]
+	then
+            prompt_confirm "Install ${dtool}?"
+	    if [ "$?" = "5" ]
+	    then
+		yesToAll="1"
+	    elif [ "$?" = "1" ]
+	    then
+		ls /fail >& /dev/null
+	    elif [ "$?" = "0" ]
+	    then
+		ls / >& /dev/null
+	    fi
+	fi
+        if [ "$?" = "0" ]
+        then
+    	    cmd="yum -y install"
+            for tool in "${tools[@]}"
+            do
+                cmd=${cmd}" ${dtool}-${tool}"
+            done
+	    eval ${cmd} || return $(echo -e "\033[1;31mFailed to install ${dtool} tools\033[0m" >&2 && return 1)
+        fi
     done
+
+    cd $curdir
+    return 0
 }
 
 setup_nas() {
     # Option 'n'
+    echo -e "\n\033[1;32mConfiguring access to NAS (/data/bigdisk)...\033[0m"
+
     read -r -p $'\e[1;33mPlease specify the hostname of the NAS to set up:\033[0m ' nashost
+    echo
 
     ping -c 5 -i 0.01 ${nashost}
 
@@ -762,6 +979,8 @@ EOF
 #### Drivers for special hardware ###
 install_mellanox_driver() {
     # option '-M'
+    echo -e "\n\033[1;32mInstalling Mellanox 10GbE NIC driver...\033[0m"
+
     lspci -v | grep Mellanox
     if [ ! "$?" = "0" ]
     then
@@ -769,6 +988,7 @@ install_mellanox_driver() {
 	cd $curdir
         return 1
     fi
+
     crel=$(cat /etc/system-release)
     ncrel=${crel//[!0-9.]/}
     sncrel=${ncrel%${ncrel:3}}
@@ -820,6 +1040,8 @@ EOF
 
 update_xpci_driver() {
     # option 'X'
+    echo -e "\n\033[1;32mInstalling xpci driver for current kernel...\033[0m"
+
     curdir=$PWD
     mkdir -p /tmp/xpci_update
     cd /tmp/xpci_update
@@ -861,6 +1083,8 @@ update_xpci_driver() {
 #### Networking for certain devices ####
 setup_network() {
     # Option 'N'
+    echo -e "\n\033[1;32mConfiguring network interfaces...\033[0m"
+
     netdevs=( $(ls /sys/class/net |egrep -v "virb|lo") )
     for netdev in "${netdevs[@]}"
     do
@@ -872,22 +1096,23 @@ setup_network() {
             while true
             do
                 read -r -n 1 -p $'\e[1;34m Select interface type: local uTCA (1) or uFEDKIT (2) or dnsmasq (3)\033[0m ' REPLY
+		echo
                 case $REPLY in
                     [1]) echo -e "\n\033[1;36mConfiguring ${netdev} for local uTCA network...\033[0m"
-                         configure_interface ${netdev} uTCA
-                         break
-                         ;;
+                        configure_interface ${netdev} uTCA
+                        break
+                        ;;
                     [2]) echo -e "\n\033[1;36mConfiguring ${netdev} for uFEDKIT...\033[0m"
-                         configure_interface ${netdev} uFEDKIT
-                         break
-                         ;;
+                        configure_interface ${netdev} uFEDKIT
+                        break
+                        ;;
                     [3]) echo -e "\n\033[1;36mConfiguring ${netdev} for dnsmasq...\033[0m"
-                         cat <<EOF > /etc/dnsmasq.d/ctp7
+                        cat <<EOF > /etc/dnsmasq.d/ctp7
 interface=${netdev}
 EOF
 
-                         break
-                         ;;
+                        break
+                        ;;
                     [sS]) echo -e "\033[1;33mSkipping $REPLY...\033[0m" ; break ;;
                     [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; cd $curdir; return 0 ;;
                     *) printf "\033[1;31m %s \n\033[0m" "Invalid choice, please specify an interface type, press s(S) to skip, or q(Q) to quit";;
@@ -895,267 +1120,6 @@ EOF
             done
         fi
     done
-
-    cd $curdir
-    return 0
-}
-
-#### Compatibility with CTP7 (NEEDS TO BE WRITTEN)
-connect_ctp7s() {
-    # Option 'C'
-    echo -e "\033[1;32mSetting up for ${hostname} for CTP7 usage\033[0m"
-    # Updated /etc/sysmgr/sysmgr.conf to enable the GenericUW configuration module to support "WISC CTP-7" cards.
-    if [ -e /etc/sysmgr/sysmgr.conf ]
-    then
-        mv /etc/sysmgr/sysmgr.conf /etc/sysmgr/sysmgr.conf.bak
-    fi
-
-    authkey="Aij8kpjf"
-
-    cat <<EOF > /etc/sysmgr/sysmgr.conf
-socket_port = 4681
-
-# If ratelimit_delay is set, it defines the number of microseconds that the
-# system manager will sleep after sending a command to a crate on behalf of a
-# client application.  This can be used to avoid session timeouts due to
-# excessive rates of requests.
-#
-# Note that this will suspend only the individual crate thread, and other
-# crates will remain unaffected, as will any operation that does not access an
-# individual crate.  The default, 0, is no delay.
-ratelimit_delay = 100000
-
-# If true, the system manager will run as a daemon, and send stdout to syslog.
-daemonize = true
-
-authentication {
-	raw = { "${authkey}" }
-	manage = { }
-	read = { "" }
-}
-
-EOF
-
-    # add crates
-    # take input from prompt for ipaddress, type, password, and description
-    nShelves=0
-    while true
-    do
-        prompt_confirm "Add uTCA shelf to sysmgr config?"
-        if [ "$?" = "0" ]
-        then
-            while true
-            do
-                read -r -n 1 -p $'\e[1;34m Add uTCA shelf with MCH of type: VadaTech (1) or NAT (2)\033[0m ' REPLY
-                case $REPLY in
-                    [1]) echo -e "\n\033[1;36mAdding uTCA shelf with VadaTech MCH...\033[0m"
-                         type="VadaTech"
-                         password="vadatech"
-                         break
-                         ;;
-                    [2]) echo -e "\n\033[1;36mAdding uTCA shelf with NAT MCH...\033[0m"
-                         type="NAT"
-                         password=""
-                         break
-                         ;;
-                    [sS]) echo -e "\033[1;33mSkipping $REPLY...\033[0m" ; break ;;
-                    [qQ]) echo -e "\033[1;34mQuitting...\033[0m" ; cd $curdir; return 0 ;;
-                    *) printf "\033[1;31m %s \n\033[0m" "Invalid choice, please specify an MCH type, press s(S) to skip, or q(Q) to quit";;
-                esac
-            done
-
-            while true
-            do
-                read -r -p $'\e[1;34mPlease specify the IP address of the MCH:\033[0m ' REPLY
-                rx='([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
-                oct='(0[0-7]{0,2})|([1-9][0-9])|(1[0-9][0-9])|(2[0-4][0-9])|(25[0-5])'
-                rex="^$oct.$ot.$oct.$oct$"
-                re1="^([0-9]{1,3}\.){3}(\.?[0-9]{1,3})$"
-                re2="^([0-9]{1,3}.){3}(.?[0-9]{1,3})$"
-                re3='^([0-9]{1,3}.){3}(.?[0-9]{1,3})$'
-                # if ! [[ "$REPLY" =~ $re1 ]]
-                # if ! [[ "$REPLY" =~ $re2 ]]
-                if ! [[ "$REPLY" =~ $re3 ]]
-                then
-                    printf "\033[1;31m %s \n\033[0m" "Invalid IP address ${REPLY} specified"
-                    continue
-                fi
-                ipaddr=$REPLY
-                break
-            done
-
-            read -r -p $'\e[1;34mPlease enter a description for this uTCA shelf:\033[0m ' REPLY
-            desc=$REPLY
-            cat <<EOF >> /etc/sysmgr/sysmgr.conf
-crate {
-	host = "${ipaddr}"
-	mch = "${type}"
-	username = ""
-	password = "${password}"
-	authtype = none
-	description = "${desc}"
-}
-EOF
-            nShelves=$((nShelves+1))
-        elif [ "$?" = "1" ]
-        then
-            echo -e "\n\033[1;36mDone adding ${nShelves} shelves, now moving on to configs\033[0m"
-            break
-        fi
-    done
-
-    cat <<EOF >> /etc/sysmgr/sysmgr.conf
-# *** Modules ***
-#
-# These modules will be loaded in the order specified here.  When a new card is
-# detected, they will be checked in reverse order to determine which module
-# will service that card.  If no module claims a card, it will be serviced by
-# the system manager with no special functionality.
-
-cardmodule {
-	module = "GenericUW.so"
-	config = {
-		"ivtable=ipconfig.xml",
- 		"poll_count=12",
- 		"poll_delay=15"
-	}
-}
-
-cardmodule {
-        module = "GenericUW.so"
-        config = {
-                "ivtable=ipconfig.xml",
-                # "poll_count=27448000",
-                "poll_count=52596000",
-                "poll_delay=30",
-                "support=WISC CTP-6",
-                "support=WISC CIOX",
-                "support=WISC CIOZ",
-                "support=BU AMC13"
-        }
-}
-
-cardmodule {
-	module = "UWDirect.so"
-	config = {
-		"ivtable=ipconfig.xml",
-                # "poll_count=27448000",
-		"poll_count=105192000",
-		"poll_delay=15",
-		"support=WISC CTP-7#19",
-		"support=WISC CIOZ#14"
-	}
-}
-
-EOF
-
-    # Created /etc/sysmgr/ipconfig.xml to map geographic address assignments for crates 1 and 2 matching the /24
-    # subnets associated with the MCHs listed for them in /etc/sysmgr/sysmgr.conf.  These addresses will occupy
-    # 192.168.*.40 to 192.168.*.52 which nmap confirms are not in use.
-    if [ -e /etc/sysmgr/ipconfig.xml ]
-    then
-        mv /etc/sysmgr/ipconfig.xml /etc/sysmgr/ipconfig.xml.bak
-    fi
-
-    if [ -d /etc/cmsgemos ]
-    then
-        if [ -e /etc/cmsgemos/connections.xml ]
-        then
-            mv /etc/cmsgemos/connections.xml /etc/cmsgemos/connections.xml.bak
-        fi
-    else
-        mkdir /etc/cmsgemos
-    fi
-
-    echo -e "\033[1;32mCreating configuratinos assuming a 'local' network topology and only CTP7s, if this is not appropriate for your use case, please modify the resulting files found at /etc/sysmgr/ipconfig.xml,  /etc/cmsgemos/connections.xml\033[0m"
-    authkey="Aij8kpjf"
-
-    cat <<EOF > /etc/cmsgemos/connections.xml
-<?xml version="1.0" encoding="UTF-8"?>
-
-<connections>
-EOF
-    cat <<EOF > /etc/sysmgr/ipconfig.xml
-<IVTable>
-EOF
-    if [ $nShelves = "0" ]
-    then
-        nShelves=1
-    fi
-
-    for crate in $(eval echo "{1..$nShelves}")
-    do
-        cid=$(printf '%02d' ${crate})
-        cat <<EOF >> /etc/sysmgr/ipconfig.xml
-    <Crate number="${crate}">
-EOF
-    cat <<EOF >> /etc/hosts
-
-192.168.${crate}.10 mch-c${cid} mch-c${cid}.utca
-192.168.1.13 amc-c${cid}-s13-t1 amc-c${cid}-s13-t1.utca
-192.168.1.14 amc-c${cid}-s13-t2 amc-c${cid}-s13-t2.utca
-EOF
-    cat <<EOF >> /etc/cmsgemos/connections.xml
-  <!-- uTCA shelf ${crate} -->
-  <connection id="gem.shelf${cid}.amc13.T1" uri="chtcp-2.0://localhost:10203?target=amc-c${cid}-13-t1:50001"
-              address_table="file://${AMC13_ADDRESS_TABLE_PATH}/AMC13XG_T1.xml" />
-  <connection id="gem.shelf${cid}.amc13.T2" uri="chtcp-2.0://localhost:10203?target=amc-c${cid}-13-t2:50001"
-              address_table="file://${AMC13_ADDRESS_TABLE_PATH}/AMC13XG_T2.xml" />
-EOF
-        for slot in {1..12}
-        do
-            sid=$(printf '%02d' $slot)
-            cat <<EOF >> /etc/sysmgr/ipconfig.xml
-        <Slot number="${slot}">
-            <Card type="WISC CTP-7">
-                <FPGA id="0">${slot} 192 168 ${crate} $((slot+40)) 255 255 0 0 192 168 0 180 192 168 0 180 0 0</FPGA>
-            </Card>
-        </Slot>
-EOF
-            cat <<EOF >> /etc/hosts
-192.168.1.$((slot+40)) amc-c${cid}-s${sid} amc-c${cid}-s${sid}.utca
-EOF
-            cat <<EOF >> /etc/cmsgemos/connections.xml
-  <!-- AMC slot ${slot} shelf ${crate} -->
-  <connection id="gem.shelf${cid}.amc03" uri="ipbustcp-2.0://amc-c${cid}-s${sid}:60002"
-	      address_table="file://${GEM_ADDRESS_TABLE_PATH}/uhal_gem_amc_ctp7_amc.xml" />
-EOF
-            for lin in {0..11}
-            do
-                lid=$(printf '%02d' $lin)
-            cat <<EOF >> /etc/cmsgemos/connections.xml
-  <connection id="gem.shelf${cid}.amc03.optohybrid${lid}" uri="ipbustcp-2.0://amc-c${cid}-s${sid}:60002"
-	      address_table="file://${GEM_ADDRESS_TABLE_PATH}/uhal_gem_amc_ctp7_link${lid}.xml" />
-EOF
-                done
-            cat <<EOF >> /etc/cmsgemos/connections.xml
-
-EOF
-        done
-        cat <<EOF >> /etc/sysmgr/ipconfig.xml
-        <Slot number="13">
-            <Card type="BU AMC13">
-                <FPGA id="0">13 255 255 0 0 192 168 ${crate} 14</FPGA> <!-- T2 -->
-                <FPGA id="1">13 255 255 0 0 192 168 ${crate} 13</FPGA> <!-- T1 -->
-            </Card>
-        </Slot>
-EOF
-        cat <<EOF >> /etc/hosts
-EOF
-        cat <<EOF >> /etc/sysmgr/ipconfig.xml
-    </Crate>
-EOF
-        cat <<EOF >> /etc/cmsgemos/connections.xml
-
-EOF
-    done
-    cat <<EOF >> /etc/sysmgr/ipconfig.xml
-</IVTable>
-EOF
-
-    cat <<EOF >> /etc/cmsgemos/connections.xml
-</connections>
-EOF
 
     ## Set up host machine to act as time server
     if [ -e /etc/xinetd.d/time-stream ]
@@ -1294,9 +1258,149 @@ EOF
     ## Restart dnsmasq
     # new_service dnsmasq on
 
+    cd $curdir
+    return 0
+}
+
+#### Compatibility with CTP7 (NEEDS TO BE WRITTEN)
+connect_ctp7s() {
+    # Option 'C'
+    echo -e "\n\033[1;32mSetting up ${HOSTNAME} for CTP7 usage\033[0m"
+
+    echo '$1' $1 '$2' $2 '$3' $3
+    if [ -z "$1" ] || [[ ! "$1" =~ ^([0-9]?)$ ]]
+    then
+        echo -e "\033[1;33mPlease specify number of uTCA shelves this machine should communicate with\033[0m"
+	cd $curdir
+        return 1
+    fi
+    nShelves=$1
+
+    echo -e "\033[1;32mCreating configuratinos assuming a 'local' network topology and only CTP7s."
+    echo -e "If this is not appropriate for your use case, please modify the files found at /etc/sysmgr/ipconfig.xml and /etc/cmsgemos/connections.xml\033[0m"
+
+    # Created /etc/sysmgr/ipconfig.xml to map geographic address assignments for crates 1 and 2 matching the /24
+    # subnets associated with the MCHs listed for them in /etc/sysmgr/sysmgr.conf.  These addresses will occupy
+    # 192.168.*.40 to 192.168.*.52 which nmap confirms are not in use.
+    if [ -d /etc/sysmgr ]
+    then
+	if [ -e /etc/sysmgr/ipconfig.xml ]
+	then
+            mv /etc/sysmgr/ipconfig.xml /etc/sysmgr/ipconfig.xml.bak
+	fi
+    else
+        mkdir /etc/sysmgr
+    fi
+
+    if [ -d /etc/cmsgemos ]
+    then
+        if [ -e /etc/cmsgemos/connections.xml ]
+        then
+	    mv /etc/cmsgemos/connections.xml /etc/cmsgemos/connections.xml.bak
+        fi
+    else
+        mkdir /etc/cmsgemos
+    fi
+
+    cat <<EOF > /etc/cmsgemos/connections.xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<connections>
+EOF
+    cat <<EOF > /etc/sysmgr/ipconfig.xml
+<IVTable>
+EOF
+    if [ $nShelves = "0" ]
+    then
+        nShelves=1
+    fi
+
+    cat <<EOF >> /etc/hosts
+
+## Geographic uTCA hostnames
+EOF
+
+    for crate in $(eval echo "{1..$nShelves}")
+    do
+        cid=$(printf '%02d' ${crate})
+        cat <<EOF >> /etc/sysmgr/ipconfig.xml
+    <Crate number="${crate}">
+EOF
+	cat <<EOF >> /etc/hosts
+
+#### uTCA shelf ${crate}
+EOF
+	cat <<EOF >> /etc/cmsgemos/connections.xml
+  <!-- uTCA shelf ${crate} -->
+  <connection id="gem.shelf${cid}.amc13.T1" uri="chtcp-2.0://localhost:10203?target=amc-c${cid}-13-t1:50001"
+              address_table="file://${AMC13_ADDRESS_TABLE_PATH}/AMC13XG_T1.xml" />
+  <connection id="gem.shelf${cid}.amc13.T2" uri="chtcp-2.0://localhost:10203?target=amc-c${cid}-13-t2:50001"
+              address_table="file://${AMC13_ADDRESS_TABLE_PATH}/AMC13XG_T2.xml" />
+EOF
+        for slot in {1..12}
+        do
+            sid=$(printf '%02d' $slot)
+            cat <<EOF >> /etc/sysmgr/ipconfig.xml
+        <Slot number="${slot}">
+            <Card type="WISC CTP-7">
+                <FPGA id="0">${slot} 192 168 ${crate} $((slot+40)) 255 255 0 0 192 168 0 180 192 168 0 180 0 0</FPGA>
+            </Card>
+        </Slot>
+EOF
+            cat <<EOF >> /etc/hosts
+192.168.${crate}.$((slot+40)) gem.shelf${cid}.amc${sid} gem-shelf${cid}-amc${sid} amc-c${cid}-s${sid} amc-c${cid}-s${sid}.utca
+EOF
+            cat <<EOF >> /etc/cmsgemos/connections.xml
+  <!-- AMC slot ${slot} shelf ${crate} -->
+  <connection id="gem.shelf${cid}.amc03" uri="ipbustcp-2.0://amc-c${cid}-s${sid}:60002"
+	      address_table="file://${GEM_ADDRESS_TABLE_PATH}/uhal_gem_amc_ctp7_amc.xml" />
+EOF
+            for lin in {0..11}
+            do
+                lid=$(printf '%02d' $lin)
+		cat <<EOF >> /etc/cmsgemos/connections.xml
+  <connection id="gem.shelf${cid}.amc03.optohybrid${lid}" uri="ipbustcp-2.0://amc-c${cid}-s${sid}:60002"
+	      address_table="file://${GEM_ADDRESS_TABLE_PATH}/uhal_gem_amc_ctp7_link${lid}.xml" />
+EOF
+            done
+            cat <<EOF >> /etc/cmsgemos/connections.xml
+
+EOF
+        done
+        cat <<EOF >> /etc/sysmgr/ipconfig.xml
+        <Slot number="13">
+            <Card type="BU AMC13">
+                <FPGA id="0">13 255 255 0 0 192 168 ${crate} 14</FPGA> <!-- T2 -->
+                <FPGA id="1">13 255 255 0 0 192 168 ${crate} 13</FPGA> <!-- T1 -->
+            </Card>
+        </Slot>
+EOF
+	cat <<EOF >> /etc/hosts
+192.168.${crate}.10 gem.shelf${cid}.mch gem-shelf${cid}-mch mch-c${cid} mch-c${cid}.utca
+## FIXME these must be determined from the actual AMC13s, unless they are configured to have their IP addresses set
+# 192.168.${crate}.13 gem.shelf${cid}.amc13.t1 gem-shelf${cid}-amc13-t1 amc-c${cid}-s13-t1 amc-c${cid}-s13-t1.utca
+# 192.168.${crate}.14 gem.shelf${cid}.amc13.t2 gem-shelf${cid}-amc13-t2 amc-c${cid}-s13-t2 amc-c${cid}-s13-t2.utca
+EOF
+        cat <<EOF >> /etc/sysmgr/ipconfig.xml
+    </Crate>
+EOF
+        cat <<EOF >> /etc/cmsgemos/connections.xml
+
+EOF
+    done
+    cat <<EOF >> /etc/sysmgr/ipconfig.xml
+</IVTable>
+EOF
+
+    cat <<EOF >> /etc/cmsgemos/connections.xml
+</connections>
+EOF
+
     ## Update /etc/hosts with CTP7-related dns (bird) names
     cat <<EOF >> /etc/hosts
-# falcons
+
+## UW CTP7 birdnames
+#### falcons
 EOF
     for bird in {1..2}
     do
@@ -1306,7 +1410,7 @@ EOF
     done
 
     cat <<EOF >> /etc/hosts
-# ravens
+## ravens
 EOF
     for bird in {1..6}
     do
@@ -1316,35 +1420,12 @@ EOF
     done
 
     cat <<EOF >> /etc/hosts
-# eagles
+## eagles
 EOF
     for bird in {1..65}
     do
         cat <<EOF >> /etc/hosts
 192.168.250.$((9+bird)) eagle$bird eagle$bird.utca
-EOF
-    done
-
-    cat <<EOF >> /etc/hosts
-# geographic
-EOF
-    for shelf in {1..4}
-    do
-	snum=$(printf %02d $shelf)
-        cat <<EOF >> /etc/hosts
-192.168.$shelf.10 gem.shelf$snum.mch gem-shelf$snum-mch mch-c$snum mch-c$snum.utca
-EOF
-	for amc in {1..12}
-	do
-	    anum=$(printf %02d $amc)
-            cat <<EOF >> /etc/hosts
-192.168.$shelf.${amc} gem.shelf$snum.amc$anum gem-shelf$snum-amc$anum amc-c$snum-s$anum amc-c$snum-s$anum.utca
-EOF
-	done
-        cat <<EOF >> /etc/hosts
-## FIXME these must be determined from the actual AMC13s, unless they are configured to have their IP addresses set
-# 192.168.$shelf.13 gem.shelf$snum.amc13.t1 gem-shelf$snum-amc13-t1 amc-c$snum-s13-t1 amc-c$snum-s13-t1.utca
-# 192.168.$shelf.14 gem.shelf$snum.amc13.t2 gem-shelf$snum-amc13-t2 amc-c$snum-s13-t2 amc-c$snum-s13-t2.utca
 EOF
     done
 
@@ -1355,6 +1436,8 @@ EOF
 #### Accounts and NICE users
 create_accounts() {
     # Option 'A'
+    echo -e "\n\033[1;32mCreating standard GEM DAQ accounts\033[0m"
+
     # may want LDAP users/groups to manage these as well
     # or even 'service' accounts, but better to have them tied to egroups
     # so one can log in with NICE credentials, a la cchcal
@@ -1396,17 +1479,35 @@ create_accounts() {
 
 add_cern_users() {
     # Option 'u'
+    echo -e "\n\033[1;32mAdding specified NICE accounts\033[0m"
+
     ### probably better to have a list of users that is imported from a text file/db
     # or better yet, an LDAP group!
     groups=( gempro gemdev daqpro gemdaq gemsudoers )
     while true
     do
         read -r -p $'\e[1;34mPlease specify text file with NICE users to add:\033[0m ' REPLY
+	echo
         if [ -e "$REPLY" ]
         then
+	    yesToAllUsers=
+	    echo -e "\n\033[1;32mYou will be presented with individual options to add each user specified in ${REPLY}, by selecting 'a/A', you will add all\033[0m"
             while IFS='' read -r user <&4 || [[ -n "$user" ]]
             do
-                prompt_confirm "Add ${user} to machine $HOST?"
+		if [ -z "${yesToAllUsers}" ]
+		then
+                    prompt_confirm "Add ${user} to machine $HOST?"
+		    if [ "$?" = "5" ]
+		    then
+			yesToAllUsers="1"
+		    elif [ "$?" = "1" ]
+		    then
+			ls /fail >& /dev/null
+		    elif [ "$?" = "0" ]
+		    then
+			ls / >& /dev/null
+		    fi
+		fi
                 if [ "$?" = "0" ]
                 then
                     if [ ! "$(fgrep ${user} /etc/passwd)" ]
@@ -1415,11 +1516,26 @@ add_cern_users() {
                         ./newcernuser.sh ${user}
                     fi
 
+		    yesToAllGroups=
+		    echo -e "\n\033[1;32mYou will be presented with individual options to add ${user} to ${groups[@]}, by selecting 'a/A', they will be added to all\033[0m"
                     for gr in "${groups[@]}"
                     do
                         if [ "$(fgrep ${gr} /etc/group)" ]
                         then
-                            prompt_confirm "Add ${user} to ${gr} group?"
+			    if [ -z "${yesToAllGroups}" ]
+			    then
+				prompt_confirm "Add ${user} to ${gr} group?"
+				if [ "$?" = "5" ]
+				then
+				    yesToAllGroups="1"
+				elif [ "$?" = "1" ]
+				then
+				    ls /fail >& /dev/null
+				elif [ "$?" = "0" ]
+				then
+				    ls / >& /dev/null
+				fi
+			    fi
                             if [ "$?" = "0" ]
                             then
                                 echo "Adding ${user} to ${gr} group"
@@ -1448,94 +1564,115 @@ add_cern_users() {
 
 usage() {
     echo -e \
-         "Usage: $0 [options]\n" \
-         " Options:\n" \
-         "    -a Setup new system with defaults for DAQ with accounts (implies -iAN)\n" \
-         "    -i Install only software (implies -xcmrS\n" \
-         "    -x install xdaq software\n" \
-         "    -c Install cactus tools (uhal and amc13)\n" \
-         "    -m Install miscellaneous packages\n" \
-         "    -S Install UW system manager\n" \
-         "    -r Install root\n" \
-         "    -p Install additional python versions\n" \
-         "    -d Install developer tools\n" \
-         "    -n Setup mounting of NAS\n" \
-         "    -C Set up CTP7 connections\n" \
-         "    -N Set up network interfaces\n" \
-         "    -M Install Mellanox 10GbE drivers for uFEDKIT\n" \
-         "    -X Install/update xpci drivers\n" \
-         "    -A Create common users and groups\n" \
-         "    -Z Install Xilinx USB drivers\n" \
-         "    -V Install Xilinx Vivado\n" \
-         "    -I Install Xilinx ISE\n" \
-         "    -L Install Xilinx LabTools\n" \
-         "    -u <file> Add accounts of NICE users (specified in file)\n" \
-         "\n" \
-         " Examples:\n" \
-         "   Set up newly installed machine and add CERN NICE users: ${0} -au\n" \
-         "   Set up newly installed machine and add uFEDKIT support: ${0} -aM\n" \
-         "\n" \
-         "Plese report bugs to\n" \
-         "https://github.com/cms-gem-daq-project/cmsgemos\n"
+        "Usage: $0 [options]\n" \
+        " Options:\n" \
+        "    -a Setup new system with defaults for DAQ with accounts (implies -iAN)\n" \
+        "    -i Install only software (implies -xcmrS\n" \
+        "    -x install xdaq software\n" \
+        "    -c Install cactus tools (uhal and amc13)\n" \
+        "    -m Install miscellaneous packages\n" \
+        "    -S Install UW system manager\n" \
+        "    -r Install root\n" \
+        "    -p Install additional python versions\n" \
+        "    -d Install developer tools\n" \
+        "    -n Setup mounting of NAS\n" \
+        "    -C Set up CTP7 connections for N shelves (requires numerical argument)\n" \
+        "    -N Set up network interfaces\n" \
+        "    -M Install Mellanox 10GbE drivers for uFEDKIT\n" \
+        "    -X Install/update xpci drivers\n" \
+        "    -A Create common users and groups\n" \
+        "    -Z Install Xilinx USB drivers\n" \
+        "    -V Install Xilinx Vivado\n" \
+        "    -I Install Xilinx ISE\n" \
+        "    -L Install Xilinx LabTools\n" \
+        "    -u <file> Add accounts of NICE users (specified in file)\n" \
+        "\n" \
+        " Examples:\n" \
+        "   Set up newly installed machine and add CERN NICE users: ${0} -au\n" \
+        "   Set up newly installed machine and add uFEDKIT support: ${0} -aM\n" \
+        "\n" \
+        "Plese report bugs to\n" \
+        "https://github.com/cms-gem-daq-project/cmsgemos\n"
 }
+### Error mesages
+aerr=""
+ierr=""
+xerr="\033[1;31mFailed to install xDAQ packages\033[0m"
+cerr="\033[1;31mFailed to install uhal and amc13 libraries\033[0m"
+merr="\033[1;31mFailed installing miscellaneous packages\033[0m"
+Serr="\033[1;31mFailed to install sysmgr\033[0m"
+rerr="\033[1;31mFailed to install ROOT packages\033[0m"
+perr="\033[1;31mFailed to install extra python versions\033[0m"
+derr="\033[1;31mFailed to install developer tools\033[0m"
+nerr="\033[1;31mFailed to set up NAS\033[0m"
+Cerr="\033[1;31mFailed to set up network interfaces\033[0m"
+Nerr="\033[1;31mFailed to set up CTP7 connections\033[0m"
+Merr="\033[1;31mFailed Mellanox driver step\033[0m"
+Xerr="\033[1;31mFailed xpci driver step\033[0m"
+Aerr="\033[1;31mFailed to create common accounts\033[0m"
+Zerr="\033[1;31mFailed to install Xilinx USB drivers\033[0m"
+Verr="\033[1;31mFailed to install Vivado\033[0m"
+Ierr="\033[1;31mFailed to install ISE\033[0m"
+Lerr="\033[1;31mFailed to install LabTools\033[0m"
+uerr="\033[1;31mFailed to add CERN users\033[0m"
 
-while getopts "aixcmSrpdnNCMXAZVILuh" opt
+while getopts "aixcmSrpdnNC:MXAZVILuh" opt
 do
     case $opt in
         a)
             echo -e "\033[1;34mDoing all steps necessary for new machine\033[0m"
-            install_xdaq
-            install_cactus
-            install_root
-            install_sysmgr
-            install_misc_rpms
-            create_accounts
-            setup_network
+            install_misc_rpms || exit $(echo -e "${merr}" >&2 && return 1)
+            install_xdaq      || exit $(echo -e "${xerr}" >&2 && return 1)
+            install_cactus    || exit $(echo -e "${cerr}" >&2 && return 1)
+            install_root      || exit $(echo -e "${rerr}" >&2 && return 1)
+            install_sysmgr    || exit $(echo -e "${Serr}" >&2 && return 1)
+            create_accounts   || exit $(echo -e "${Aerr}" >&2 && return 1)
+            setup_network     || exit $(echo -e "${Cerr}" >&2 && return 1)
             ;;
         i)
             echo -e "\033[1;33mInstalling necessary packages\033[0m"
-            install_xdaq
-            install_cactus
-            install_root
-            install_sysmgr
-            install_misc_rpms
+            install_misc_rpms || exit $(echo -e "${merr}" >&2 && exit 1)
+            install_xdaq      || exit $(echo -e "${xerr}" >&2 && exit 1)
+            install_cactus    || exit $(echo -e "${cerr}" >&2 && exit 1)
+            install_root      || exit $(echo -e "${rerr}" >&2 && exit 1)
+            install_sysmgr    || exit $(echo -e "${Serr}" >&2 && exit 1)
             ;;
         x)
-            install_xdaq ;;
+            install_xdaq || exit $(echo -e "${xerr}" >&2 && exit 1) ;;
         c)
-            install_cactus ;;
+            install_cactus || exit $(echo -e "${cerr}" >&2 && exit 1) ;;
         m)
-            install_misc_rpms ;;
+            install_misc_rpms || exit $(echo -e "${merr}" >&2 && exit 1) ;;
         S)
-            install_sysmgr ;;
+            install_sysmgr || exit $(echo -e "${Serr}" >&2 && exit 1) ;;
         r)
-            install_root ;;
+            install_root || exit $(echo -e "${rerr}" >&2 && exit 1) ;;
         p)
-            install_python ;;
+            install_python || exit $(echo -e "${perr}" >&2 && exit 1) ;;
         d)
-            install_developer_tools ;;
+            install_developer_tools || exit $(echo -e "${derr}" >&2 && exit 1) ;;
         n)
-            setup_nas ;;
+            setup_nas || exit $(echo -e "${nerr}" >&2 && exit 1) ;;
         N)
-            setup_network ;;
+            setup_network || exit $(echo -e "${Cerr}" >&2 && exit 1) ;;
         C)
-            connect_ctp7s ;;
+            connect_ctp7s ${OPTARG} || exit $(echo -e "${Nerr}" >&2 && exit 1) ;;
         M)
-            install_mellanox_driver ;;
+            install_mellanox_driver || exit $(echo -e "${Merr}" >&2 && exit 1) ;;
         X)
-            update_xpci_driver ;;
+            update_xpci_driver || exit $(echo -e "${Xerr}" >&2 && exit 1) ;;
         A)
-            create_accounts ;;
+            create_accounts || exit $(echo -e "${Aerr}" >&2 && exit 1) ;;
         Z)
-            : ;;
+            : || exit $(echo -e "${Zerr}" >&2 && exit 1) ;;
         V)
-            : ;;
+            : || exit $(echo -e "${Verr}" >&2 && exit 1) ;;
         I)
-            : ;;
+            : || exit $(echo -e "${Ierr}" >&2 && exit 1) ;;
         L)
-            : ;;
+            : || exit $(echo -e "${Lerr}" >&2 && exit 1) ;;
         u)
-            add_cern_users ;;
+            add_cern_users || exit $(echo -e "${uerr}" >&2 && exit 1) ;;
         h)
             echo >&2 ; usage ; exit 1 ;;
         \?)
